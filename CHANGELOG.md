@@ -1,5 +1,1123 @@
 # Changelog
 
+## About page shows ticked items staying in place (2026-10-24)
+
+- The demo video on the About page now matches the app: ticking an item leaves it where it is, struck through and faded, then Clean up in the list's title row sends it away. Light and dark versions and both poster pictures were retaken; the lists in the demo are a bit wider so their titles fit beside Clean up.
+- "Try it: tick one off" works the same way: a ticked point stays in its place, struck through and faded, and there is no "Completed" heading any more.
+- The video's description for screen readers says the same.
+
+## AI client: Test key follow-ups (2026-11-12)
+
+- Test key no longer says "Key works." when Anthropic's reply breaks on the way (cut off or unreadable). It now says it couldn't reach Anthropic, like any lost connection.
+- A running Test key is now stopped, and says nothing, when something changes under it: the model is picked again, the key is forgotten (here or in another tab), a new key is saved, or you sign out or someone else signs in.
+- A request that times out now says Anthropic took too long, not "Stopped." (that word is only for when you cancel).
+- Clearer messages: a rate limit (too many requests, wait a minute) is no longer mixed with a spend or billing limit, a key that isn't allowed has its own message, and a browser that can't save the use count no longer claims you reached your monthly limit.
+- Saved boards are unchanged; the key is still kept only in this browser.
+
+## AI client: Note Board can now talk to Claude with your own key (2026-11-12)
+
+- New "Test key" button in AI settings (beside Forget key). It sends one tiny request to Anthropic with your saved key, counts as one of this month's uses, and says "Key works." or what went wrong in plain words: a key that isn't valid, an Anthropic organization that blocks browser use (Zero Data Retention or Compliance API), a spend or rate limit, Anthropic being busy, no connection, and so on.
+- Behind it is the one piece every AI feature will use to ask Claude: it sends only what the feature chose, straight from your browser to Anthropic, never through BusyAnts. It checks Claude's answer before anything uses it, sends nothing once the monthly limit is reached, and never writes your key anywhere it could leak.
+- The site's security policy now lets pages reach Anthropic's API (`https://api.anthropic.com` only), as the owner agreed on 2026-11-12.
+- The Privacy page says what an AI button sends, to whom, and with whose key. The AI settings hint says the same.
+- No AI feature on the board uses it yet; those come next. Saved boards are unchanged.
+
+## Your AI key goes when you sign out or delete your account (2026-11-12)
+
+- The Anthropic key you keep in AI settings is now removed from this browser when you sign out, when someone else signs in on this browser, and when you delete your account. It is removed whether it was kept for the tab or on the device, and from every open tab.
+- Reloading the page while you stay signed in keeps it, as before.
+- Your choice of model, your monthly limit and this month's count stay: they are settings of this device, like dark mode.
+- Your boards are not touched by this change.
+- The Privacy page now says when the key is removed.
+
+## AI settings: a place for your own AI key (2026-11-12)
+
+- New row "AI settings" in the ⋯ menu (also on a phone). It opens a small dialog where you can keep your own Anthropic key, choose a model and set a monthly limit.
+- Nothing uses the key yet, and the dialog sends nothing anywhere. It is groundwork for the AI features planned later.
+- The key stays in this browser only: for this tab by default, or on this device if you tick "Remember on this device". It is never saved with your boards or sent to your account, and after saving only its start and last four letters show.
+- The dialog warns that anyone using this browser profile can use the key and that it costs money on your Anthropic account, and suggests a separate workspace with a low spend limit and a key that expires.
+- Model choices: Haiku 5.5 (fast, cheapest, the default), Sonnet 5.5 (better) and Opus 5.5 (best). The monthly limit starts at 200 uses and shows how many are used this month.
+- The Privacy page has a short new section about a key you enter.
+
+## Privacy page date and AI key tidy-up (2026-11-12)
+
+- The Privacy page now says "Effective from November 12, 2026", the day its AI key wording was added.
+- Behind the scenes: putting back an AI key after a failed save no longer depends on two lists being in the same order, and the AI key tests clean up after themselves. Nothing changes on screen.
+
+## Sort with AI: a batch that fails the same way is not billed again (2026-11-15)
+
+- When Claude declines a batch of finished items, its answer is too long, or it comes back in the wrong shape, those items are now remembered as asked (with no label, so they keep their built-in categories). Before, nothing was remembered, so every time the Visualizer opened, Sort automatically sent the same 50 items again, costing a use each time, and the items behind them were never sorted.
+- The sort stops at that batch and says so in plain words, for example "Claude declined to sort 50 finished items, so they keep their built-in categories." The next sort sends the items behind it.
+- Failures that may pass next time (no connection, a time-out, too many requests, a spend limit, a key problem, Anthropic busy) still save nothing, so those items are tried again later.
+- Picking another model, or Forget key, asks about those items again, as for any item with no label.
+
+## Sort with AI: only your own boards (2026-11-13)
+
+- Sort with AI in the Visualizer now sends only finished items from your own boards. Items on boards other people shared with you are never sent to Anthropic, and they keep the built-in categories (even if they were sorted before this change).
+- The line under the button says so: "Sends the text of N finished items from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you."
+- Just after signing in, while your shared boards are still loading, the button waits (so nothing from them can slip through).
+- The AI settings hint says the same: an AI button sends the text of finished checklist items from your own boards, never from boards shared with you, straight from your browser to Anthropic, with your key.
+- The Play Store Data safety draft (`docs/play-store/data-safety.md`) now says what goes to Anthropic, when, and how, and declares it as shared with a third party (Other user-generated content, optional).
+- The Privacy policy (`privacy/`) now says an AI button sends the text of finished checklist items from your own boards (never from boards shared with you), and that Test key sends only a tiny test message. Effective date moved to November 13, 2026.
+
+## An Antigravity session can be the crew coordinator (2026-11-23)
+
+- The owner can now run the crew from an Antigravity session as well as from Claude Code. It keeps its own private Crew Log, and the crew skill explains how to hand the crew back to Claude Code.
+
+## Arrow keys move the board (2026-10-29)
+- On a computer, with nothing selected, the arrow keys now pan the board like scrolling: ↓ shows what is further down, → what is further right. Each press moves the board 80px, and Shift plus an arrow moves it 400px. Holding a key keeps going.
+- Nothing else changed: with something selected the arrows still move it, and they still belong to text fields, checklists, menus, panels and a focused resize handle. Alt+arrows and Ctrl+arrows work as before, and the phone layout is untouched.
+- Moving the board this way is not an edit: it is not saved and not undoable.
+- The Keyboard shortcuts list describes it.
+- Nothing about saved boards changed.
+
+## Coordinator can merge clean high-risk pull requests without waiting (2026-11-23)
+
+- Once `/check-pr` and all GitHub tests pass cleanly on a `high-risk` pull request, the crew coordinator now merges it and publishes `main` without waiting for the owner's yes (owner decision). Workers still never merge `high-risk` pull requests themselves, and any real bug, clash, or data-loss concern still stops for fixes or owner approval.
+
+## Backspace at the start of a checklist item joins it to the item above (2026-11-11)
+
+- Pressing Backspace with the cursor at the very start of a checklist item now joins its words onto the end of the item above it, with the cursor where the two meet. Before, nothing happened. It is the mirror of Delete at the end of an item.
+- A first sub-item joins onto its parent. The joined item's own sub-items move up one level. A ticked item joins like any other; the result stays ticked only if both were. One Ctrl+Z undoes it.
+- On the first item of a list nothing happens, and Backspace on an empty item still deletes it, as before.
+
+## Claude Code best-practices check (2026-11-08)
+- Weekly check of Anthropic's Claude Code best-practices pages: the advice is the same as on 2026-10-29, so nothing in the setup changed.
+- The checklist document now shows the new check date and page fingerprints.
+- Nothing about the app or saved boards changed.
+
+## Claude Code best-practices check (2026-11-15)
+- Weekly check of Anthropic's Claude Code best-practices pages: the advice is the same as on 2026-11-08, so nothing in the setup changed.
+- The checklist document now shows the new check date, the new page fingerprints, and two small facts it records from the pages (`/context all` shows loaded files, and an environment variable can raise the Stop-hook block limit).
+- Two new questions for the owner are written down in the checklist (whether the push guard should also cover Windows PowerShell, and whether security review can stall a background worker).
+- Nothing about the app or saved boards changed.
+- Owner answers (2026-11-16): the push guard now also watches Windows PowerShell commands, not only Bash, so a blocked push stays blocked on the Windows computer. Security review stays as it is for now.
+
+## Bigger text sizes, up to 250% (2026-10-23)
+
+- A+ now goes three steps further after Largest (175%): 200%, 225% and 250%. A− brings them back down; a size you saved before still loads.
+- Everything on a card or container grows with the step, as the item buttons and card buttons already did: checklist tick boxes (and the tick mark and press area around them), the Completed header and its arrow, Clean up and Uncheck all, a link card's address box and Open link button, a board card's Open board button, the "Delete container?" question, and the label that follows a dragged item.
+- At the biggest sizes a narrow card stays tidy: "Completed" is shortened with … instead of running off the card, Clean up and Uncheck all wrap onto two lines, at 225% and up a card’s buttons drop under its title instead of covering it, and a collapsed card's buttons stay inside the card. Item text in a 200px-wide card wraps to only a few letters a line at 250%, so widen the card at the top sizes.
+- The toolbar, bars, side panels and menus keep their size, and so does the phone layout.
+
+## Brain dump: turn a messy list into cards (2026-11-11)
+
+- New: Brain dump. Open it from the Add group in the toolbar (the new icon next to Container), from the ⋯ menu in a medium window, or on a phone from + and from ⋯ (in the Board group).
+- Type or paste one thing per line. A preview shows the cards you will get: a Note for a plain line, a Checklist for a line that starts with [ ], and a time tag when the line says how long it takes (30m, 1h30).
+- "Add N cards" puts them on the board near what you are looking at, selected and not covering anything. One Undo takes them all away again.
+- Times show in the preview only for now. They are not saved on the cards yet.
+- Nothing you typed is lost if you close the window by mistake, until the cards are added.
+- Not shown on a board that is shared with you to view only.
+
+## Groundwork for "Brain dump": turning pasted text into card drafts (2026-11-11)
+
+- Nothing changes on screen yet. This adds the reading step for a coming "Brain dump" feature: paste messy text and get one draft card per line.
+- Bullets, numbers and checkboxes at the start of a line are dropped. A line with a checkbox becomes a to-do draft; every other line becomes a note draft.
+- A time estimate such as "30m", "1h", "1h30", "1.5h", "90 min" or "(45m)" is read out of the line and kept as minutes. Lines with no estimate have none.
+- At most 300 drafts are read from one paste (the same limit as importing a file), and each title is cut at 200 characters.
+
+## Calendar arrows sit together (2026-11-19)
+
+- In the Google Calendar panel, the back and forward arrows (‹ and ›) now sit side by side on the left, with the dates (like "15–21 Nov 2026") after them, in both Week and Month. They look like the joined pair of arrows in the Habits panel. Clicking, hover text and Tab order are unchanged.
+
+## Calendar: new events start at noon (2026-11-17)
+
+- A new Google Calendar event now starts at 12:00 PM and ends at 1:00 PM (it was 9:00 to 10:00). This is what the + beside a day opens, and clicking a day in the Month grid that is already picked.
+- Events you already have are unchanged, and saved boards are unchanged.
+
+## Calendar: quicker delete (2026-10-24)
+
+- Deleting a one-off calendar event (not part of a series) no longer asks "Delete “Dentist”?": the event card's trash, the edit form's Delete button and the Delete or Backspace key delete it at once. If the event has guests, "Send update emails to guests?" is still asked.
+- Deleting an event in a repeating series still asks "Delete “Team stand-up”?", now with just two red buttons of the same width, **Only this event** and **All events in the series**, and no Keep button. Escape, × or a click outside still keeps the event. The buttons sit side by side when there is room, or one above the other at full width when the card is too narrow for both labels on one line. Neither button has the keyboard when the question opens, so holding Enter on the trash can't delete by accident; Tab reaches them.
+- Only a fresh press of Delete or Backspace deletes. Holding the key down never deletes an event, and once a press has deleted one, the held key doesn't go on to delete the note selected on the board behind.
+- Read-only events, and the "Save changes to which events?" question with its Cancel button, are unchanged.
+
+## Drag an event to another day in the calendar (2026-11-11)
+- In the Calendar panel you can now drag one of your own events onto another day, in the Week list or the Month grid, and it moves there, as in Google Calendar. It keeps its time of day and its length.
+- The day you are over is outlined while you drag, and a copy of the event follows the mouse. Escape cancels. Letting go on the same day does nothing.
+- It is saved to Google like pressing Save in the event form. Afterwards the "Event saved" message appears with Undo, which puts the old day back and never emails guests. If Google says no, the event jumps back to its old day and says so.
+- An event with guests asks "Send update emails to guests?" first. A repeating event moves on its own, as it does in the form.
+- A click on an event still opens it, and events that are not yours (gray) can't be dragged. Touch screens are unchanged for now: tap still opens the event. The event form's Start date still moves an event by keyboard.
+- Nothing about saved boards changed: calendar events are not board data.
+
+## Calendar: the end time follows the start time (2026-10-29)
+
+- In the calendar's New event and Change event forms (the quick-add and the full form), changing the start time now moves the end time by the same amount, so the event keeps its length, as in Google Calendar. A new event starts at one hour, so 10:00 becomes 10:00 to 11:00, and 14:00 becomes 14:00 to 15:00.
+- Changing the end time only changes the end; that becomes the event's new length for the next start change.
+- A one-day event never runs past midnight this way: its end stops at 23:59. An event that already spans several days carries its end across midnight.
+
+## Calendar: adding and changing an event opens an overlay (2026-10-24)
+
+- In the Calendar panel, the + for a new event and the pencil on an event's card no longer take over the whole panel. A small overlay pops up just left of the panel, level with the day or event, like the event card, and the Week or Month list stays in view.
+- Adding starts as a quick-add: title (the cursor is already in it), date, start and end time (9:00 to 10:00 to begin with) or All day, Save, and More options. Enter in the title saves. More options opens the full form (Ends, Guests, Cancel) in the same overlay with everything you typed kept.
+- Changing an event opens the full form straight away, as before, but in the overlay. Clicking an open event's card again still opens it.
+- Escape, the new × or a click outside closes the overlay without saving; saving or deleting closes it and the list shows the result. On a phone it is a sheet from the bottom, with 16px fields so the page doesn't zoom, and it sits above the keyboard.
+- The form's rules are unchanged: end-before-start note, guest emails, the repeating-event questions and the Delete question.
+
+## Drag the divider between the expanded Month calendar and Main checklist (2026-11-24)
+
+- When the Month calendar is expanded beside the open Main checklist on desktop, the divider between them can now be dragged left and right (or moved with the Left/Right arrow keys, and double-clicked to reset) to smoothly adjust how much space each panel takes, keeping both at least 300px wide.
+- Dragging this expanded split leaves both panels' remembered normal widths untouched, so collapsing the calendar or switching back to Week view restores their usual widths cleanly.
+
+## Calendar events you're going to are green (2026-11-21)
+
+- In the Calendar panel (Week and Month), every event you haven't said No to is now green: your own events, invites you accepted, and invites you answered Maybe to or haven't answered yet.
+- Maybe and unanswered invites also get a dashed green edge, as a reminder to reply.
+- Events on days already gone are a paler green, so the past still looks faded; past dates keep their gray.
+- Declined events, and Google's special kinds like birthdays or out of office, look the same as before.
+
+## Calendar: only real meetings are green (2026-11-22)
+
+- Green in the calendar panel now means a real meeting: an event with someone else on its guest list, or one someone else sent you (an invite, such as an interview invite). Invites you haven't answered or said Maybe to still get the dashed green edge.
+- Events you made just for yourself, with no other guests (reminders, blocks of time), keep the normal event color again, in the Week list, the Month grid, the picked day's list and search results. Past ones still fade as before.
+- Add a guest to one of your own events and it turns green as soon as you save it.
+- Declined events and Google's special kinds (birthdays, out of office, focus time) look as before. Nothing is saved or sent differently; boards are unchanged.
+
+## Ctrl+Z and new keys for calendar events (2026-11-17)
+- With the Google Calendar panel open, Ctrl+Z now undoes your last event change: adding, editing, dragging or deleting an event. It works even after the "Event deleted · Undo" message has gone, and it goes back several steps (the last 50).
+- Ctrl+Y (or Ctrl+Shift+Z) makes the change again. Neither ever emails guests.
+- If your last change was on the board instead, Ctrl+Z undoes the board first: whichever change is newer goes first. With the panel closed, Ctrl+Z and Ctrl+Y work on the board exactly as before.
+- New keys in the calendar panel: N for a new event (12 to 1pm on the day you're looking at), T for today, ← and → for the week or month before or after. With an event's card open: E or Enter to edit it, Ctrl+D to copy it at the same time (the copy has no guests, so no one gets an invitation). None of them fire while you're typing.
+- The Keyboard shortcuts list (?) shows the new keys.
+- If an undo or redo can't reach Google (you're offline, or Google says too many requests), it says so with a **Try again** button and keeps that step, so Try again, or pressing Ctrl+Z (or Ctrl+Y) again, tries it again. A step is dropped only when Google says the change can't be made (the event is gone, for example); then the message says the change can't be undone (or redone), with no button.
+- The little message at the bottom is now as wide as its words on a phone, and wraps onto a second line there instead of being cut short with "…".
+- Undo puts back the event as this session last saw it, even if it was changed in Google Calendar since.
+- Nothing about saved boards changed. The event history is kept in memory only, and is gone after a reload.
+
+## Calendar changes show at once (2026-11-17)
+- Adding, changing or deleting one of your events in the Calendar panel no longer waits for Google: the form or card closes and the list shows the change straight away, while Google is told in the background, as Google Calendar does. This covers one-off events, "Only this event" of a repeating one, and dragging an event to another day.
+- The "Event added / saved / deleted · Undo" message appears once Google has answered, so Undo always works on something Google really has.
+- If Google says no, only that event goes back to how it was (a new one disappears again, with its typed title), and the bottom message says "That change didn’t reach Google Calendar. Try again later." with no Undo.
+- While a change is still on its way, that event's pencil and trash are greyed out, so it can't be changed twice at once.
+- Notes about the form itself (an end before the start, a bad email address) still show in the form, which stays open. Changes to "All events in the series" still wait for Google with the form open, as before.
+- Nothing about saved boards changed: calendar events are not board data. The Visualizer is unchanged.
+
+## Google Calendar stays connected (2026-11-20)
+
+- Google's window for the calendar can now show just once per account, instead of about once an hour. A small helper on Cloudflare (free plan) keeps a long-lived permission from Google, encrypted, and hands the page a fresh hour's access whenever it needs one, on any device, with no window. It lasts until you click the new **Disconnect calendar** link at the bottom of the calendar panel, take the permission back in your Google account, or delete your account.
+- Signing out on one device forgets only that device's access; your other devices stay connected.
+- Deleting your account now also cancels the calendar connection at Google and deletes the helper's copy.
+- It is off until the owner sets the helper up (docs/calendar-helper-setup.md) and adds its address as the `CALENDAR_HELPER_URL` repository variable. Until then, or whenever the helper can't be reached, the calendar works exactly as before.
+- The Privacy policy (now effective November 20, 2026) and the Delete your account page say what the helper keeps and where. The site's security policy allows the helper's address only when it is set.
+- Saved boards are unchanged: nothing here touches board data.
+
+## Easier-to-read Calendar Month view (2026-11-23)
+
+- **Expand / Collapse toggle (desktop Month view):** Added an Expand/Collapse button in the Google Calendar panel header (beside ×) when in Month view on desktop. Expanding widens the panel to ~80% of the viewport (leaving at least 300px of board visible) without changing your saved panel width; collapsing, switching back to Week view, or closing the panel restores your saved width, and dragging the resize strip exits expanded mode and saves the new width.
+- **More readable Month event chips:** Replaced the indented dot with a slim colored left bar (2.5px, keeping green-meeting, read-only, past, and all-day distinctions), raised chip wrapping from 2 lines to 3 lines, and increased events shown per day before `+N more` (up to 3 when narrow, 4 at normal desktop width, 5 when wide/expanded).
+- **Desktop hover preview:** Hovering over a Month event chip with a mouse shows a floating preview popover with the full title, date/time range, and location (when present), without stealing focus or interfering with click-to-open or drag-to-move. Dismisses cleanly on mouseleave, click, drag start, or Escape, and never opens on touch taps.
+- **Side-by-side selected-day agenda when wide:** When the Calendar panel is wide (`>= 800px`, e.g., expanded or resized wider) on desktop, the selected day's full event list appears right beside the Month grid instead of pushed below it; narrower panels and phones keep it stacked below the grid.
+
+## Calendar Month view: tidier event text (2026-10-24)
+
+- In the Calendar panel's Month view, an event's name now continues right after its start time on the same line and wraps under the time, like Google Calendar, instead of sitting in a thin column beside it.
+- Each event (timed or all-day) shows at most two lines, then ends with …, so the days stay even. The full name is still in the hover text and in the day's list under the grid.
+- Words are no longer broken in the middle ("Produc / t / Market / ing"); they wrap only at spaces. Only a single word longer than the whole line may still break, so nothing runs out of its day.
+- The dot stays at the left of the first line. Narrow cells (no time or dot), the 3 / 2 events per day and "+n more" are unchanged.
+
+## Calendar weeks show at once when you step (2026-11-19)
+
+- Once a week or month has loaded in the Calendar panel, the one before and the one after are fetched quietly. Stepping to them with the arrows now shows their events straight away, then refreshes them in the background.
+- A week or month that was not fetched yet shows "Loading…" and no events, never the previous week's events under the new heading.
+- Any change you make (add, edit, move, delete, Undo, Redo) forgets what was fetched ahead, so an old or deleted event never comes back. Closing and reopening the panel also starts fresh.
+- Your boards and what is saved are not touched. This only reads from Google Calendar.
+
+## Repeating options in Google Calendar (2026-11-23)
+
+- The event form (both quick-add and full form) now has a **Repeat** dropdown like Google Calendar's: Does not repeat, Daily, Weekly on that weekday, Monthly on the nth/last weekday, Annually, Every weekday, and **Custom…** (every N days, weeks, months or years, weekday buttons, monthly by day or weekday, and Ends Never / On a date / After N times).
+- You can make a new event or an existing one-off event repeat, or change how an existing repeating event repeats across the whole series (including back to Does not repeat). Series with complex rules the app can't read stay read-only and untouched.
+- Repeating events keep the same green/blue meeting look as other events, and Undo / Ctrl+Z removes a new series or puts the old repeat rule back.
+
+## Less waiting after saving a calendar event (2026-11-20)
+
+- Saving one event was already shown at once. What still felt slow came after it: every save threw away the weeks the panel had fetched ahead, so the next week (or going back to this one) showed "Loading…" until Google answered again. Now, once Google has the change, those weeks are fetched again quietly, and stepping after a save is instant again (about 0.96 s down to 0.14 s on a slow connection).
+- "All events in the series" still waits for Google, but the Save button now says "Saving…" while it does, and the form closes as soon as Google has the change instead of also waiting for the whole calendar to be fetched again (about one round trip to Google sooner). The list then updates by itself a moment later; until it does, that series' events show as still on their way and can't be changed again.
+- Nothing changes in what is sent to Google, in the questions asked before saving, or in Undo.
+
+## A soft "Event added / saved / deleted · Undo" message in the calendar (2026-10-29)
+
+- After you add, change or delete an event in the Google Calendar panel, a small message appears at the bottom of the screen, like Google Calendar's: "Event added", "Event saved" or "Event deleted", with an **Undo** button. It is the same message the board shows after a delete, and it goes by itself after 6 seconds.
+- **Undo** takes the change back in Google Calendar: a new event is removed, a changed event gets its old title, times and guests back, and a deleted event (one, or a whole repeating series) comes back as it was.
+- If Undo of an "All events" change only half reaches Google, the calendar is fetched again so it shows what Google has, and the message says so.
+- Deleting an event someone already deleted in Google Calendar shows "Event deleted" without Undo, so it can't be brought back by mistake.
+- Undo never emails guests. Guests who were emailed about the change are not told it was undone.
+- Only one message shows at a time: a newer calendar or board message replaces the older one.
+
+## Calendar stays steady between weeks (2026-11-19)
+
+- Stepping through weeks no longer nudges the calendar sideways: the side panels now always keep room for a scrollbar, so a busy week that scrolls and a quiet week that doesn't look the same width.
+
+## Calendar: scroll on through the weeks, past days faded (2026-11-20)
+
+- The calendar's Week view is now one long list of days. Scroll down for later weeks and up for earlier ones, as far as you like.
+- The heading above the list follows the scroll and names the week at the top.
+- ‹ and ›, Today, and the keys ←, → and T glide the list to the week before, the week after, or this week. With reduced motion they jump straight there.
+- A week whose events haven't arrived yet shows its days in light gray for a moment, and the list never jumps when weeks are added above.
+- Days already gone are shown in softer colors, in the Week list and in the Month grid, so the past is easy to tell apart. They still open, edit and drag as before.
+- The Month view is otherwise unchanged.
+
+## Instant calendar search and 5-year partial matching (2026-11-23)
+
+- Opening the calendar search box now preloads your events quietly in the background, so matching results appear immediately as you type instead of waiting on Google for every query.
+- Widened partial-word matching from 2 years to the full **5 years back and 5 years forward** (matching Google's search window).
+
+## Partial-match search in Google Calendar (2026-11-23)
+
+- Calendar search now finds events on partial word matches (prefix, middle, suffix, multiple partial words, or part of a guest email — like typing "dent" for "Dentist" or "yak" for "Kayaking lesson"), even when Google Calendar's built-in `q` search misses partial words.
+- Partial matching uses a read-only in-memory index of the primary calendar (2 years back and 2 years forward, refreshed automatically after any event change, fresh open, or account switch) combined with Google's 5-year search, with no new Google permissions.
+
+## Search in the calendar (2026-11-19)
+- The calendar panel has a new magnifier button ("Search events") next to Today. It opens a search box at the top of the panel, with the cursor in it. You can also press / with the keyboard in the calendar panel.
+- It searches your whole main calendar, past and future, with Google's own event search: names, descriptions, places and guests.
+- Results replace the Week or Month list while you have text in the box: grouped by date, upcoming events first (soonest at the top), then past events (most recent first). It shows "Searching..." while it waits and "No events found" when there are none.
+- Click a result to go to that day and open the event's card. Escape, or the x in the box, closes the search and brings back the week or month as it was.
+- Works on the phone too. The Keyboard shortcuts list (?) shows the new / key. Ctrl+F is still the board's Find.
+- Nothing about saved boards changed. Search only reads from Google Calendar; it asks for no new permission and changes nothing.
+
+## Calendar weeks start on Sunday (2026-11-17)
+
+- In the Calendar panel, the Month view now starts each week on Sunday (Sun Mon Tue Wed Thu Fri Sat).
+- The Week view shows the Sunday-to-Saturday week you are on, headed like "15–21 Nov 2026", instead of today and the next six days. Back and forward move a week, and Today returns to this week.
+- Habits, the Journal, the Completed panel, the Visualizer and the week review keep weeks starting on Monday.
+
+## Calendar: our own time picker, like Google Calendar's (2026-10-29)
+
+- The Start and End time boxes in the calendar's New event and Change event forms (the quick-add and the full form) no longer use the browser's own time dropdown, whose minutes sat off-centre from the hours. They are now a text box showing the time as "2:00 PM" that opens a list of times every 15 minutes, with the current time in view and highlighted.
+- The End list starts right after the start and shows how long each option makes the event: "2:15 PM (15 mins)", "3:00 PM (1 hr)", "4:30 PM (2.5 hrs)".
+- A time can also be typed ("2:10pm", "14:10", "9") and is taken when you leave the box or press Enter; a time it can't read goes back to what it was.
+- Keys: ↑ / ↓ move through the list, Enter picks, Escape closes just the list (the next Escape closes the form). A click outside closes the list. On a phone the options are big enough to tap (44px) and the text doesn't make the page zoom.
+- Changing the start still moves the end with it, keeping the event's length.
+
+## A time typed in a calendar event's name sets its start (2026-11-22)
+
+- Type a time into a calendar event's title, like "Dinner 8pm" or "Dinner at 8:30pm", and press Save: the event moves to that time on the same day, keeps its length, and is saved as just "Dinner".
+- A range like "8-9pm" or "8pm-10pm" sets both the start and the end.
+- It works for new events and when changing an existing one. A number without am or pm (like "Room 101") stays in the name, and all-day events are left alone. Undo puts the old name and time back.
+
+## Calendar week view: dates on the left, events beside them (2026-10-24)
+
+- In the Calendar panel's Week view, each day now has its date on the left ("Thu 15") and its events in a column to the right. The first event sits on the same line as the date and the rest stack under it, so nothing is under the date any more.
+- The date column is a fixed width, so all seven days line up. It fits the panel at its narrowest (300px) and on a phone. The + for a new event stays on the date's line.
+- Today's date is shown in bold amber instead of with the words "· Today". The Month view is unchanged.
+
+## Calendar loads many weeks ahead in one go (2026-11-20)
+
+- In the Week view, once a week has loaded, the 4 weeks before it and the 8 weeks after it are fetched quietly in one request, so stepping through them shows events at once. In the Month view the month before and after come in one request.
+- Weeks with more than 250 events are fetched with more pages (up to 4); if that is still not enough, only the weeks that were fully fetched are kept, and the rest load when you step to them.
+- Stepping to within 2 weeks of the end of what was fetched fetches the next stretch.
+- Events that run over two weeks show in both, the same as before.
+- Fix: if you sign out and someone else signs in while the Calendar panel stays open, none of the first person's events can show up. Everything fetched is thrown away, and late answers for the first person are ignored.
+- Your boards and what is saved are not touched. This only reads from Google Calendar.
+
+## Honey well tick boxes (2026-10-23)
+
+- Checklist tick boxes have a new look: a honey-tinted square with an amber border, filled with amber and a thin tick when ticked (a dark tick in dark mode). The border, corners and tick grow with A−/A+.
+- The text of an item now looks centered next to its box: the box sits a hair lower (1px at Normal, 2px at 200%), and the gap between box and text grows with A+.
+- Pressing a box shrinks it a little for a moment. Ticked text is struck through with a softer line and faded.
+- The phone keeps its 16px box and big tap area. Habits and the Completed panel boxes look the same as before.
+
+## Checkbox and text line up better (2026-11-13)
+- A checklist item's tick box now sits only a little below the middle of the first line of text: 2.5% of the line (0.5px at Normal, 1px at 200%), down from 7.5% (1.5px at Normal). The text now reads about 1px lower beside its box than before, which is the look you liked in the other app.
+- The Completed panel's tick boxes (items and sub-items) got the same small nudge, so their text lines up with the box the same way as in a checklist. Before, they had none and the text looked a touch too low.
+- Only the boxes moved, by one pixel at most at Normal. Their size, the gap to the text and the fold arrow are the same.
+- Nothing about saved boards changed.
+
+## Checklist centering guard (2026-10-23)
+
+- A new browser test now checks, in the real app, that every checklist tick box stays centered on its item's first line (the same slightly-low spot as before), with the same gap to the text. It covers every text size, every text style and font, open and ticked items, sub-items, wrapped items, light and dark, and the phone layout. If a later change moves the centering, the test fails and names the case.
+- Nothing looks different: the test found the centering already correct everywhere.
+
+## Checklist items in the Completed panel (2026-11-13)
+
+- The Checklist panel no longer has its own Completed button. Items you clean up from the main checklist now show in the normal **Completed** panel (⋯ More, or the Completed tile on a phone), mixed in with the open board's items under the same dates, each marked "Checklist".
+- Unticking one sends it back to the end of your main checklist. Ctrl+Z in the Completed panel takes your unticks there back, newest first; Ctrl+Y redoes them. Once they run out, Ctrl+Z there does nothing (it never undoes something else on the board).
+- Boards already saved are not changed: each board still keeps its own Completed items.
+
+## Pasting copied checklist items keeps them as items (2026-10-31)
+
+- Copy several checklist items, click into an item of another list and press Ctrl+V: they now land as separate items with the same indent levels, text formatting (bold, italic, size, font) and ticked state, instead of everything going into one item.
+- They go after the item you clicked in (in its place if that item is empty), are highlighted afterwards, and one Ctrl+Z takes them back.
+- Text copied from another app still pastes as plain text, as before.
+- Only items copied in the app paste as items; the same words copied again, or copied from another app, or Ctrl+Shift+V, paste as plain text. Items copied across several lists paste as text only.
+- Sub-items copied without their parent keep their indent relative to each other.
+
+## A "3 of 5 done" count on checklists (2026-11-03)
+
+- A checklist now shows a small gray count right after its title, such as "Groceries 3/5": ticked items out of all items, sub-items included. When everything is ticked, the count turns the calm green of the tick boxes.
+- An item that has sub-items shows its own small count after its text, such as "Trip 1/3", for everything under it.
+- A blank item at the end of a list is not counted, so a finished list reads "all done" without it.
+- The count updates as you tick, untick, add or delete items. It is not saved, can't be edited, and is not part of the title or the item text, so copying and Download as text are unchanged. Screen readers hear "3 of 5 done" on the list's title.
+- It works on the phone, at every text size and in dark mode. The Habits and Completed panels have no counts.
+
+## Checklist panel header lines up (2026-11-19)
+
+- "Clean up" in the main Checklist panel is now the same size as the "Checklist" title, in the title's dark color and a bolder weight, so it no longer looks smaller. Clean up on cards on boards is unchanged.
+- The done count (like "5/13") beside the title sits about 1px higher, level with the title's capital letters instead of hanging below.
+
+## Deeper checklist indent (2026-10-29)
+
+- Sub-items in a checklist are now indented 32px per level (it was 22px), so it is easier to see which item a checkbox belongs to. No guide lines were added.
+- The Completed panel indents sub-items the same way.
+- In a narrow list the deepest levels stop short instead of squeezing the text into a column a few pixels wide.
+- Dragging an item to the right of another one still nests it under that one.
+
+## Checklist rows a little further apart (2026-10-24)
+
+- There is now 2px more space between checklist items (and between sub-items) at Normal text size. It grows with the A− / A+ text size like the text does. The tick boxes, the grip and trash can, and the phone's tap areas sit exactly where they did.
+
+## Checklist panel no longer pans the board (2026-11-23)
+
+- Dragging to select items or text (or dragging items around) in the main Checklist panel never moves the board behind it, even near the top-left edge of the screen.
+- Highlighting text inside a single checklist item on a board no longer pans the board when the pointer reaches the screen edge.
+
+## Checklist panel keys and focus (2026-11-15)
+
+- With a dialog open (Brain dump, AI settings, Sign out, Send feedback), Tab, Delete, Backspace and Ctrl+X no longer indent, delete or cut items selected in the Checklist panel behind it.
+- Ctrl+Z on a new item in the Checklist panel keeps the keyboard in the panel, so the next Ctrl+Z steps the checklist back, never the board behind it.
+- With the Main checklist board open beside the panel, pressing Enter in the board's copy keeps the cursor there instead of jumping into the panel's copy.
+- Dragging an item in the panel over blank panel space no longer drops it into the board underneath.
+
+## Checklist row spacing set to 1.5px (2026-10-26)
+
+- The extra space between checklist items (and sub-items) is now 1.5px at Normal text size, halfway between the 1px that was live and the earlier 2px. It still grows with the A− / A+ text size. Nothing else about the rows moved.
+
+## Checklist row spacing trimmed to 1px (2026-10-24)
+
+- The extra space between checklist items (and sub-items) is now 1px at Normal text size instead of 2px, since 2px looked a bit too large. It still grows with the A− / A+ text size. Nothing else about the rows moved.
+
+## Top-level checklist items fold with 1 or more sub-items (2026-11-23)
+
+- Top-level parent items in checklists (both on the board and in the Main checklist) can now always collapse as long as they have at least 1 sub-item: the fold arrow appears beside the tick box, clicking it or pressing Ctrl+Up / Ctrl+Down hides and shows the sub-item, and the list adds the left room for top-level arrows as soon as any top-level parent has 1 sub-item.
+- Nested parent items (sub-items with sub-items of their own) still require 2 or more direct sub-items to collapse. A fold saved on a nested parent with one sub-item still shows open without rewriting saved data.
+
+## Highlighting words across checklist items, like a word processor (2026-11-01)
+
+- Press on an item's text and drag into the next items: only the letters from where you pressed to where the pointer is get highlighted, not whole rows. A pointer just above the next item ends on the last line of the item above.
+- Delete, Backspace or typing removes just those words and joins what is left of the first and last item. Enter splits there. One Ctrl+Z brings everything back.
+- Ctrl+C / Ctrl+X take exactly the highlighted words; they paste into another list as items, and other apps get plain text.
+- Ticking, the trash and dragging by the grip still act on every item the highlight touches. Dragging from the grip or empty row space still selects whole items.
+- Shift+click on text extends the highlight.
+- Deleting a highlight works like Backspace: the joined item is ticked only if both ends were, and a highlight from the very start of an item removes the items before the last one whole, leaving the last item as it was. When whole items go, the Undo message shows.
+- With a highlight, Ctrl+Shift+Backspace still asks before deleting completed items, ? still opens the shortcuts list, and keys pressed while a question or panel is open leave the list alone.
+
+## Claude Code best-practices check (2026-10-29)
+
+- New `docs/claude-best-practices.md`: which Anthropic Claude Code pages we follow (the best-practices page and the ones on CLAUDE.md, skills, subagents, hooks, settings, permissions, costs and workflows), what each one recommends, and what we do about it. A daily check compares it with the live pages.
+- `CLAUDE.md` now says how to start in a fresh worktree (`npm ci`), how to run a single test file, and what to keep when a long session is compacted. It also points to the new file.
+- `CLAUDE.local.md` and `.claude/settings.local.json` are now ignored by git, so personal notes and settings can't be committed by accident.
+- No app changes. Twelve questions for the owner are listed at the end of the new file.
+
+- CLAUDE.md's "Code layout" section is now three short rules (the model is pure, store actions get the core through StoreContext, components hold no geometry or rules logic); the plain folder descriptions are gone.
+
+- CLAUDE.md is shorter: cut the parts Claude does by default, gets elsewhere (skill list, package.json, GitHub, hooks) or can look up, keeping the owner's own decisions.
+
+## Clean up no longer squeezes a list's title (2026-10-24)
+
+- A list's title was cut short ("To bo", "Packi") in narrow lists because the "Clean up" button took its room. The title now always keeps the full width it has without Clean up.
+- If the title, Clean up, the collapse arrow and the trash can all fit on one line, nothing changes: Clean up stays between the title and the arrow. If they don't fit, Clean up drops onto its own short line under the title, at the right, and the arrow and trash can stay on the title's line.
+- Clean up is still always visible while something in the list is ticked, at every text size, in light and dark, on the phone and inside containers.
+- Boards already saved open the same as before; nothing in the saved data changes.
+
+## Visualizer: watch your finished items replay (2026-11-12)
+
+- New: Visualizer. Open it from the Visualizer row in the toolbar's ⋯ More menu, or the Visualizer tile at the bottom of the ⋯ sheet on a phone. It fills the screen and closes with the × or Escape.
+- It replays what Clean up moved into the Completed panels, from the oldest item to the newest, then starts again. Every board is a wedge of a glowing ring, every list is a cell in it, and every finished item is a spark that flies in and lights its cell.
+- Pick 7 days, 30 days or All (it opens on 30 days). Big numbers show items done today, this week and in the range, with a chart of items done per day and a "Just finished" list that fills as sparks land.
+- It is always dark and glowing, even in light mode. With "reduce motion" on, nothing flies or spins: cells just light up as items land.
+- It only looks. It never changes, saves or syncs your boards, and it counts every board you can open, hidden and shared ones too.
+- With nothing cleaned up yet it says so.
+
+## A + button in every container (2026-11-10)
+
+- Every container's header now has a **+** button next to the collapse arrow and the trash can. Click it and a new checklist appears as the last card in that container, with the cursor in its title so you can type the name right away. Ctrl+Z takes it back in one step.
+- If the container is collapsed, the + opens it so you can see the new checklist; Ctrl+Z removes the checklist and closes the container again.
+- It looks and behaves like the other two buttons: the same size, shown when you point at the container, select it or tab to it (always shown on a touch screen), with the tooltip "Add a checklist".
+- At the very biggest text sizes, a container's three buttons now stop growing a little earlier than before so the container's name still has room (a narrow container's buttons are about 52px instead of 80px at 400% text). Nothing changes up to 160% text (up to 200% in a container of the usual width).
+
+## The container's + now adds the checklist at the top (2026-11-11)
+
+- When you press the **+** in a container's header, the new checklist now appears as the **first** card, right under the container's name, instead of at the bottom. The cursor is in its title as before, and the cards that were already there move down one place.
+- Nothing else changes: Ctrl+Z still removes it in one step, on a collapsed container the + still opens it first, and the container itself stays where it is and just grows downward. Same on a phone.
+
+## Done counts sit a little lower (2026-11-11)
+- The "1/3" next to a checklist's title and next to a parent item now sits a little lower, so its numbers line up with the middle of the lowercase letters beside it instead of looking too high.
+- Only the position of those small numbers changed, at every text size and on the phone.
+- Nothing about saved boards changed.
+
+## Done count nudged up (2026-11-10)
+
+- The small "1/3" count after a parent checklist item's text sat about 1px too low. It now sits a hair higher, so its numbers line up with the middle of the item's capital letters, at every text size.
+- The list title's count was already lined up and is unchanged.
+
+## Content Security Policy on every page (2026-11-11)
+
+- Every page of the site (the app, About, FAQ, Terms, Privacy and Delete your account) now tells the browser which sites it may load scripts and frames from and send requests to. A script slipped into a page can no longer load more code from elsewhere or send your boards (or, later, your own Anthropic key) to a site of its own with a request.
+- Allowed: the site itself, Google sign-in and Firebase sync, Google Calendar, Google Fonts, the Anthropic API, the YouTube and Vimeo players, and the visit counter. Pictures and videos on link cards still come from any secure (https) site.
+- Download as picture / PDF: a picture from a site that allows copying is now loaded again as a picture and copied in, instead of being fetched, so it still shows in the download. Pictures from sites that don't allow it are a blank panel, as before, and a picture site that never answers no longer holds up the download (it is left blank after 8 seconds).
+- Nothing you see changes, and saved boards are untouched. New browser tests fail if any page breaks the policy.
+
+## Ctrl+Enter keeps the cursor in the last ticked item (2026-10-30)
+
+- Ticking a checklist's last open item with Ctrl+Enter (⌘+Enter), or with the phone's Tick button, no longer takes the cursor out of the text and selects the whole list. The cursor stays in the item you just ticked, so pressing Delete right after removes just that item, never the whole list.
+
+## Day scheduler groundwork (2026-11-11)
+- Behind the scenes only: nothing changes on screen yet. The app can now work out the free gaps left in your day and how to pack time blocks and tasks into them.
+- Meetings and other fixed events never move, nothing is placed in the past, times round to 5 minutes, and the order is kept. What doesn't fit is flagged to move to tomorrow.
+- Days when the clocks change are counted in real minutes. Nothing about saved boards changed.
+
+## Journal: divider fixes (2026-10-31)
+
+- Clicking a divider, or pressing Ctrl+Z so one comes back under the cursor, puts the cursor next to it. Before, typing there did nothing, and a letter typed straight after the click could be lost.
+- The Divider button on an empty heading line turns that line into the divider, as on an empty plain line. It no longer stacks a second divider right on top of one at the start of the note.
+- Ctrl+A selects the whole note, also when it starts with a divider. Typing over it then gives a plain line, not a bullet or heading.
+- Backspace and Delete next to a divider take a whole emoji (skin tones and flags too), and do nothing where there is nothing on that side.
+
+## Drop an item anywhere in a checklist (2026-10-23)
+
+- Dragging a checklist item over another checklist now adds it to that list wherever the pointer is inside the card, including the empty space under the last item. Before, only the spot next to the existing items counted, and the empty space said "Drop to make a new list".
+- Over an item row, dropping still puts it before, after or under that item. Below the last item it goes at the end of the list, and the card gets the dashed amber outline to show it.
+- "Drop to make a new list" now only shows when the pointer is outside every checklist.
+
+## Steadier test for hover buttons (2026-11-21)
+
+- A browser test from the paint fix sometimes failed on GitHub because it checked a card's buttons a moment too early after pointing at the card. It now waits for them. Nothing in the app changed.
+
+## Buttons keep their keys over a word highlight (2026-11-02)
+- With words highlighted across checklist items, pressing Enter, Space or a letter while a button has the keyboard focus (for example a row's "Move up") now presses the button. Before, the highlighted words were replaced by a split and the button did nothing.
+- Pasting lines copied from a Journal note into a checklist item is now also ignored while a "Delete …?" question is open, like the other pastes.
+
+## Fold arrow is bigger and darker (2026-11-11)
+
+- In a checklist, the small arrow left of a parent item is now about a third bigger, drawn a little heavier and in the full text color, so it is easy to see in both light and dark mode. It keeps its 4px gap to the tick box and stays on the middle of the first line.
+- It grows with A− / A+ again, all the way up, instead of stopping at 110%.
+- A checklist that has a parent item now gets a little extra room on its left (about 3px at Normal, more at bigger text sizes) so the bigger arrow is never cut off by the card's edge. Checklists with no parent items look exactly as before.
+- Nothing about saved boards changes.
+
+## Fold arrow no longer crowds the tick box (2026-11-11)
+
+- In a checklist, the small arrow left of a parent item now ends a clear 4px (at Normal) away from the tick box, so it no longer looks like it touches the box's border. The folded arrow (pointing right) keeps a little more room, since it is narrower.
+- At bigger text sizes the arrow used to grow until it stuck out past the card's left edge. It now stops growing at 110% of Normal's size, so it always stays inside the card, and keeps its gap to the box. On a phone it still presses from a 44px area that never covers its own tick box.
+- Nothing about saved boards changes.
+
+## Easier to click the fold arrows on checklist items (2026-11-21)
+
+- The small arrow next to a parent checklist item (the one that hides or shows its sub-items) can now be clicked from a bigger area around it: at least 24px tall and 28px wide on a computer, reaching left into the empty space. The arrow itself looks the same size.
+- The arrow sits about 5px further from its tick box, on the board and in the Main checklist, so the two no longer crowd each other. Items, sub-item indents and text don't move; a list with a top-level parent item gets 5px more room on its left.
+- The bigger area never covers the tick box, the item text or the item's drag grip, and never reaches outside the card.
+- Your boards are not touched by this change.
+
+## Fold arrow only when there are two or more sub-items (2026-11-11)
+
+- In a checklist, the fold arrow left of a parent item now shows only when that parent has 2 or more sub-items. A parent with just one sub-item has no arrow, at the top level and nested alike, since there is nothing worth hiding.
+- If a parent with one sub-item was folded before, its sub-item now shows and there is no arrow. Nothing is erased: if it gets a second sub-item later, the arrow comes back with the fold it was saved with.
+- The extra room on the left of a checklist, added for the bigger arrow, now appears only when some top-level parent has 2 or more sub-items.
+- The done count (like 1/1) shows as before. Nothing about saved boards changes.
+
+## Fold a checklist item's sub-items (2026-11-09)
+
+- An item that has sub-items now has a small arrow just left of its tick box. Click it to hide its sub-items, and click again to show them. The item keeps its "1/3" count while folded.
+- Ctrl+Up hides and Ctrl+Down shows the sub-items of the item you are typing in (⌘+Up / ⌘+Down on a Mac). The arrow can also be reached with Tab and pressed with Enter or Space.
+- The fold is saved with the board. It stays after a reload, syncs to your other devices, and is kept in backups, exports, Version history and copied items. Ctrl+Z undoes each fold or unfold.
+- Collapse all / Expand all leave item folds alone.
+- The arrow keys, Enter and selections skip hidden sub-items. Copy, cut, delete, drag and move take them along. Search finds them and rings the folded item ("in a folded item") without opening it. Clean up still moves hidden ticked items to Completed.
+- On a phone the arrow can be tapped across a 44px area without touching the tick box.
+- Ctrl+Up / Ctrl+Down only take the key when they fold or unfold something. Otherwise the key does what it always did (jump by paragraph; on a Mac, to the start or end of the text). The arrow darkens on hover.
+- When the Claude connector deletes or moves out an item's last sub-item, the fold goes too, as in the app.
+- **For the owner, after this goes live:** update the Claude connector's local copy (pull the latest code in its folder). An older connector refuses to edit boards that have folded items.
+
+## Calmer format bar (2026-11-02)
+
+- The small bar with Bold, Italic, the sizes and Font no longer pops up while you are still dragging a highlight.
+- A moment after you let go of the mouse (or stop pressing keys when highlighting with the keyboard) it fades in, above the highlighted text or below it if there is no room above, so it never covers what you highlighted.
+- It disappears at once when you type, delete, cut or copy. After Ctrl+C it stays away until you highlight something else.
+- Alt+F10 still shows it right away and moves into it. Nothing changes about saved boards.
+
+## Tapping a tick box on an iPhone ticks it again (2026-10-29)
+
+- Fixed: on an iPhone, tapping a checklist tick box while typing in the same list could leave the box unticked (the cursor stayed in the text, but the tap did nothing). The tap now ticks the box and still keeps the cursor and the on-screen keyboard in the text. Other phones and computers work as before.
+- The browser tests now also run this tap check in Safari's engine (WebKit) on an iPhone 14 profile, so it is checked on every change. It is an emulation: it checks the tick and where the cursor stays, not how a real iPhone keyboard looks or feels.
+
+## A parent item's count never drops to its own line (2026-11-11)
+
+- The "0/2" after a parent checklist item used to fall to a line under the text when the item's last line was nearly full, making the item one line taller.
+- It now always stays on the text's last line. When that line is full, the count sits in the empty space at the right end of the row (where the drag and trash buttons show on hover), so the text wraps exactly as it would without the count.
+- No card or container changes width.
+
+## A time-estimate clock on every checklist item (2026-11-11)
+
+- Each checklist item now has a faint clock button at the far right of its hover buttons (after the drag grip and the trash can). Click it to give the item an estimate: 15m, 30m, 45m, 1h, 2h, or your own minutes, the same box notes use. Setting or clearing is one undo step.
+- On a phone the clock shows while you are typing in the item, with a full-size touch area, next to the grip.
+- To make room, the free space at the right end of every item is 26px wider. A parent's "0/2" count still stays on the text's last line and never covers the clock; on a phone the free space grows a little more (16px at Normal text, more at bigger sizes) so a count like "0/12" always fits before the clock. At the biggest text sizes (225% and up) items show no clock, as notes don't.
+- Fixes to the estimate box: after Ctrl+Z inside the Minutes box it shows the undone value, so Enter no longer puts it back; pressing the pill again to close the box keeps the keyboard on the pill; and selecting from one item into the next and deleting now keeps the lower item's estimate when the upper one has none, as joining with Backspace does.
+- The box no longer re-measures itself on every change to the board, and every item row no longer listens for it opening.
+
+## Journal + tidy-up (2026-11-11)
+- Nothing changes for you: no button or key does anything different.
+- Two code notes that still said a new general note is added "below" now say it is added first, at the top; the note on typing now says it goes into the top note when none is named (the panel always names one).
+- Two new automatic tests: one shows that an out-of-date note id can't hide the notes you already wrote when you press +, and one shows that typing with no note named goes into the top note.
+
+## One + at the top of the Journal's general notes (2026-11-11)
+
+- The + that adds a general note is now a single button at the very top of the general notes, at the right end of a slim row under the Formatting bar, instead of one in every note's header. Its tooltip and name are still "Add a general note".
+- Because it is at the top, the new "Untitled note" goes first in the list, above all the others, with the cursor in its name and the name selected so you can type straight away.
+- Renaming, folding and the trash work as before. Notes you already have keep their words and their order; adding one just puts it on top.
+
+## Journal text is 14 by default (2026-11-11)
+
+- Normal Journal text is now 14px, in new notes and in notes written before. The Size box shows 14 for it.
+- Words you gave a size on purpose keep that size. Headings look exactly as before (the Size box shows 16 for a plain heading).
+- 16 is now a size of its own: choosing 16 makes the words a little bigger than normal, and choosing 14 takes the size off. Pressing Enter still carries the size to the next line.
+- Words made Small or Large long ago keep their look (they show as 14 and 21).
+- Checklist items copied into the Journal: Small now comes in as 12, one step under normal text.
+- **Behind the scenes:** boards are now saved as version 5. A copy of the app from before this change (an old tab, say) refuses them and asks for a reload instead of quietly dropping a size of 16. The Claude connector needs its newest `busyants.mcpb` (version 1.6.0, built with `npm run mcp:pack`) to change your boards again; until then it says "Safe to edit: no" and changes nothing.
+
+## Habits opens as wide as the Journal and Calendar (2026-11-12)
+- The Habits panel now opens 420px wide, the same as the Journal and the Calendar (Week view). It used to open 300px wide.
+- If you already dragged the Habits panel to a width of your own, that width is kept. Only a Habits panel you never resized opens wider; double-clicking its edge strip now brings it back to 420px.
+- A new automatic test opens the Calendar, the Journal and Habits on a fresh board and checks they are the same width.
+
+## Journal: new ways to add a divider (2026-11-11)
+
+- Typing `--` on an empty line and pressing Enter now makes a divider. Typing `---` no longer does; it stays as words.
+- New shortcut, as in Google Docs: hold Alt, press I, then R (Option on a Mac) to put in a divider, just like the Divider button. One Ctrl+Z takes it back.
+- Both are listed in the Keyboard shortcuts (?) panel, and the Divider button's tooltip shows Alt+I, then R.
+- Nothing about saving changed: a divider is still saved and shown everywhere else as a `---` line, and notes already saved open unchanged.
+
+## Journal: divider lines (2026-10-31)
+
+- The Journal's Formatting bar has a new Divider button. It puts a thin gray line across the note under the line you are on and moves the cursor to a new line below it.
+- Typing `---` on an empty line and pressing Enter makes a divider too. `---` anywhere else stays as you typed it.
+- Backspace at the start of the line after a divider, or Delete at the end of the line before it, removes it. Ctrl+Z brings it back.
+- Dividers are saved with the note and go everywhere the note goes (sync, backups, Version history). Everywhere else (the board card, search, Download as text, the Claude connector) they read as `---`. Dividers don't count as words.
+- Notes written before open unchanged. An app tab still open from before shows a divider as the words `---`.
+
+## Journal: fold all general notes, and rearrange them (2026-11-21)
+
+- A new button left of the + in the Journal panel's header folds every general note at once ("Fold all general notes"). When they are all folded it opens them all again ("Unfold all general notes"). The days are left as they are.
+- With two or more general notes, each has a grip (six dots) beside its trash: drag it up or down to put the note in a new place. The other notes slide aside to make room.
+- From the keyboard, Alt+Up / Alt+Down on a note's arrow or name moves it one place; the keyboard stays on it and a screen reader hears the new place.
+- The new order is saved and syncs like any change. Each move is one Ctrl+Z step (Ctrl+Y moves it again). Folds are still not saved: every note opens when the panel opens.
+
+## General notes in the Journal (2026-10-29)
+
+- The Journal panel has a new "General notes" section at the top, above today's page, for notes that aren't tied to a day. It is open every time the panel opens; click its header (or press Enter or Space on it) to fold it away and bring today's page up. Folded, it shows its first line.
+- It uses the same Formatting bar as the days, and Ctrl+Z / Ctrl+Y work in it.
+- It is saved as one note on the Journal board (first line "General notes"), so it syncs, backs up, exports and shows in Version history like the rest of the journal. It is made the first time you type in it, and it never counts as a day.
+
+## Several general notes, with names (2026-11-10)
+
+- The Journal panel can now hold several general notes. The + at the right of a note's header ("Add a general note") adds an "Untitled note" right below it, with its name selected so you can type a new one straight away.
+- Click a note's name to rename it: Enter or clicking away saves, Escape puts the old name back, and an empty name becomes "Untitled note". Only the small arrow folds a note now.
+- The trash in a note's header deletes it, with "Deleted 1 note" and Undo; Ctrl+Z brings it back too. The last one can't be deleted, so there is always one. The existing "General notes" note keeps its name and words.
+- If an older copy of the app (one still open in another tab or on another device) saves the Journal, your extra general notes no longer drop out of the panel: this device remembers them and lists them again, and the next change puts them back in place everywhere.
+- Typing a name with a Japanese or Chinese keyboard: the Enter that picks a character no longer saves the name early.
+- Deleting your account also clears the general notes this device remembers. Two tabs open on the Journal now agree on the general notes straight away. A general note's name is at most 200 characters.
+
+## Journal list markers in the text color, and typed lists checked in every day (2026-11-21)
+
+- In the Journal, every list marker (bullets, 1., a., i., 1) and the rest) is now drawn in the note's own text color, so it stays white in dark mode instead of turning gray.
+- New browser tests check that typing "1. ", "1) ", "- " or "* " starts a list in today's page and in an earlier day opened in place, on a new line and on the first line under the date. It already worked there; nothing in the typing changed.
+
+## Typing a list start on a list item switches it (2026-11-22)
+
+- In a Journal note, typing `1. ` or `1) ` at the start of a bulleted item now makes it numbered, and `- ` or `* ` at the start of a numbered item makes it bulleted, as in Google Docs. The item keeps its indent, and the typed characters go away.
+- `1) ` on a `1.` item switches it to the `1)` style, and `1. ` switches it back.
+- Only that item changes. Ctrl+Z right after brings back the typed characters as words.
+- It works the same in general notes and in day entries. Typing the kind the item already has (`- ` on a bullet) stays as words. Saved journals are unchanged.
+
+## Journal bullets and numbers match the text size (2026-11-20)
+
+- In the Journal, the bullet or number of a list item is now as big as the item's first character, at every indent level. A line sized 24 gets a 24 bullet or number, a line sized 10 a 10 one, and a plain line looks exactly as before.
+- The marker stays on the text's baseline and the indent steps do not move. Nothing about how notes are saved changed.
+
+- Spec wording: General notes typed on two devices before they sync follow the last save, like a day's note; the other device's text may be brought back from Version history.
+
+## Pasting in the Journal keeps text size, lists and indents (2026-11-01)
+
+- Copy lines in a Journal note (today's, another day's or the general notes) and paste them into a Journal note: they keep their text size, bold, italic, underline, strikethrough, highlight, fonts, bulleted and numbered lists with their indent levels, headings and dividers.
+- Checklist items copied with Ctrl+C paste into the Journal as a bulleted list, sub-items as deeper levels (up to four), keeping their bold, italic, size and font. Ticked items arrive as plain words, with no tick.
+- Lines copied in the Journal paste into an item of a checklist as separate items, sub-items by indent level; dividers are skipped. The formatting a checklist has (size, bold, italic, font) comes along.
+- Text copied from other apps still pastes as plain words, and so does Ctrl+Shift+V.
+- A paste is one Ctrl+Z step, and pasting over selected words still replaces them.
+- Nothing about how notes are saved changed.
+
+## The Journal's + sits next to the X (2026-11-11)
+
+- The "Add a general note" + is now in the Journal panel's top bar, right beside the X that closes it, and looks like the X. The thin row it used to sit in, under the Formatting bar, is gone, so the notes start a little higher.
+- It does the same as before: adds a new note at the top, with its name ready to type. On a phone it is a 44px button next to the X, and the title, + and X fit on one line.
+
+## Google Docs size keys in the Journal (2026-11-06)
+
+- In a Journal note, Ctrl+Shift+. makes the selected words larger and Ctrl+Shift+, makes them smaller (⌘ instead of Ctrl on a Mac), the same as the + and − beside the size number. They stop at 10 and 36, and each press is one Ctrl+Z step.
+- On the board these keys already worked for card and checklist text (Small, Normal, Large); the Keyboard shortcuts list now names them as Ctrl+Shift+. / Ctrl+Shift+, in both the Text and the Journal parts.
+
+## Journal text size is a number box (2026-10-30)
+
+- In the Journal's Aa menu, Size is now a box showing the size of the selected words in px (16 is normal), like Google Docs, instead of Small / Normal / Large.
+- − and + beside it make the words smaller or larger one step at a time (10, 12, 14, 16, 18, 20, 24, 28, 32, 36), stopping at 10 and 36. Clicking the number opens that list to pick from.
+- Words made Small or Large before keep their look; the box shows them as 14 and 21.
+- Pressing Enter keeps the size: the next line, or the next list item, is typed in the same size (after a heading it goes back to normal).
+- **Behind the scenes:** boards are now saved as version 4. A copy of the app from before this change (an old tab, say) refuses them and asks for a reload instead of quietly dropping the new sizes. The Claude connector needs its newest `busyants.mcpb` (built with `npm run mcp:pack`) to read and change your boards again.
+
+## Typed lists and Google Docs numbering in the Journal (2026-11-21)
+
+- In a Journal note, typing `1. ` or `1) ` at the start of a plain line starts a numbered list, and `- ` or `* ` starts a bulleted one, as in Google Docs. Ctrl+Z right after turns it back into the words you typed.
+- Numbered lists now nest like Google Docs: 1. 2. 3., then a. b. c. one level in, then i. ii. iii., then 1. again. A list started with `1)` shows 1) a) i) instead.
+- The board card, search, export and copy show the same markers.
+- Journals already saved keep their formatting. Their deeper numbered levels now show letters, and the note's text is updated the next time it is edited.
+
+## Checklist panel list moved in from the edge (2026-11-21)
+
+- The items in the Checklist panel on the left now sit 12px further in from the panel's edge, on a computer and on a phone. A parent's fold arrow lines up with the title "Checklist", and the tick boxes no longer crowd the edge.
+- Sub-items still step in the same amount as before.
+- Your boards are not touched by this change.
+
+## Main checklist (2026-11-12)
+
+- A new **Checklist** button in the bottom pill, after Journal and Habits (a Checklist tile in the ⋯ panel on a phone), opens your main checklist: one checklist, the same on every board.
+- It is the only panel that opens on the **left**, so it can stay open beside the Journal, Habits, the calendar or any other panel on the right. It opens 420px wide; drag the strip on its right edge to resize it (this device remembers the width). On a phone it fills the screen, one panel at a time.
+- Everything a checklist on the board does works there: sub-items, folding, ticking, dragging items, time estimates, formatting, copy and paste. **Clean up** moves ticked items into its own Completed record, which its Completed button shows.
+- Ctrl+Z in the panel undoes only the checklist; on the board it undoes only the board.
+- The list is kept on a board of its own, "Main checklist", hidden from the Boards menu, so it is saved online, synced and kept in backups and Version history like any board. Opening the panel saves nothing: it shows an empty list, and the board is made when you first type in it. Boards already saved are not changed.
+- While Version history shows an old version, the panel is read-only and says "Viewing an old version".
+
+## Version history and Completed move into the three dots (2026-11-12)
+
+- On a computer, Version history and Completed are now the first two rows of the ⋯ menu at the top right. The History and Completed buttons by the zoom control are gone, so each lives in one place.
+- Choosing a row opens its panel and closes the menu. Choosing it again, while the panel is open, closes the panel. The row says "Open" while its panel is open.
+- The ⋯ button now always shows on a computer, not only in narrower windows. In a wide window it holds just these two rows; in a narrower one the folded buttons (Arrange, File and so on) follow them, as before.
+- When Search finds a match in the closed Completed panel, the ⋯ button gets the same ring the Completed button used to get, and so does the Completed row once the menu is open.
+- On a phone, ⋯ already had both as tiles; they work the same, and Version history now shows as pressed while its panel is open, as Completed already did.
+- Nothing about saved boards, undo or the panels themselves changes.
+
+## An open sub-item added under a ticked item unticks it (2026-11-03)
+
+- When a checklist was fully ticked and you added a new sub-item (Enter at the end of its last sub-item, or Enter at the end of the parent), the new item was open but the parent stayed ticked. Now the parent, and any ticked item above it, is unticked right away, since it is only complete once every sub-item under it is. Ticked siblings stay ticked.
+- The same goes for Enter at the start of an item, Enter over highlighted words, and pasting copied items or Journal lines under a ticked item.
+- Ctrl+Z undoes the new item and the unticking together. Ticking the last open sub-item still ticks its parent.
+
+## Moving a sub-item out ticks its parent again (2026-11-22)
+
+- Adding a new sub-item under a ticked item unticks it, and deleting that sub-item ticks it again. Now moving the sub-item out from under it does the same as deleting it: press Shift+Tab on it, or drag it somewhere outside that item, and the item is ticked again if everything still under it is ticked.
+- It works on checklist cards, in the Main checklist, on the phone and with the Claude connector's move, and one Ctrl+Z undoes the move and the tick together.
+
+## Journal and Checklist edges move separately (2026-11-19)
+- Dragging the right-hand panel's edge (Journal, Habits, Calendar, Completed, Focus timer, Version history) no longer pushes the Checklist's edge. Each edge moves only its own panel.
+- The right panel's edge stops where 300px of board would be left beside the open Checklist, and the Checklist's edge still moves afterwards.
+- Only a window too narrow for both panels plus 300px of board still makes the Checklist narrow.
+
+## Done count only on top-level items (2026-11-10)
+
+- The small "1/3" count after an item's text now shows only on top-level items that have sub-items. An indented item with sub-items of its own no longer shows one, folded or open.
+- A top-level item's count still includes everything under it at every level, and the list title's count is unchanged.
+- Nothing is saved differently; the count is still worked out each time.
+
+## Big boards are lighter: faster panning and dragging (2026-11-20)
+
+- The small buttons that show when you point at a checklist item (Move up / Move down, trash can, drag grip, time-estimate clock) and at a card or container's header (collapse arrow, trash can, clock, resize corner) now draw their icons with the page's styles instead of a little picture made of several parts each.
+- They look, sit and work exactly as before (same sizes, colors, tooltips, keyboard and screen-reader names). On a big board (300 notes and 10 checklists of 50 items) the page has about half as many pieces to draw: 23,000 down to 11,500. Panning that board is about 60–90% smoother and dragging a card about 25% smoother; typing is a little lighter too.
+- In Windows High Contrast these icons show in the button text color.
+
+## Big boards: cards far off the screen aren't drawn (2026-11-21)
+
+- On a board with hundreds of cards, cards and containers more than about a screen away from what you see are no longer drawn. They keep their size and place, and are drawn again a screen before they come into view, so you never see them pop in.
+- Everything else works as before: Search and Alt+arrows jump to a far card, Download as picture or PDF shows every card, and moving or growing a card still pushes the others aside.
+- While you drag a card, the cards that don't move are no longer redrawn on every mouse move (about a third of the work it was).
+- Measured on a big test board (345 cards, computer slowed down 4 times): panning at 100% zoom about 14 to 15 frames a second before, 15 to 16 after; dragging and typing a little quicker; the board appears just as fast, with a short extra moment of work just after it shows. Zoomed out, where most cards are on screen anyway, it is about the same.
+- Saved boards are unchanged.
+
+## Big boards pan more smoothly (2026-11-21)
+
+- Panning a big board is smoother: on a 345-card test board with the computer slowed down 4 times, it went from about 7.7 to 9.7 frames a second, and the slowest frames got about a sixth quicker.
+- How: the buttons that only show when you point at something (a row's grip, trash can, time clock and Move up / down arrows; a card's or container's trash can and time clock) no longer draw their icons while they are faded out. They still fade in and out exactly as before.
+- Nothing looks different: screenshots before and after, on the board, zoomed in, in dark mode and on a phone, are identical.
+- The keyboard and screen readers still reach these buttons as before. Phones and tablets are unchanged.
+- Your boards are not touched by this change.
+
+## Opening and resizing panels is much quicker (2026-11-20)
+- Opening, closing or dragging the width of a side panel no longer makes the whole board redraw its styles, so it stays smooth on a big board.
+- The Visualizer loads the first time you open it (and as soon as you point at its button), so the app starts with about 13 KB less to download.
+
+## On a phone, tapping into a card brings it to the top (2026-10-23)
+
+- On a phone, tapping into a note, a checklist, a container or one of their titles now slides the board so that card's top sits just under the top bar. It used to stay wherever it was, often in the middle of the screen, where the keyboard covered it.
+- A card made with + goes to the top of the screen too.
+- Moving between the items of the same card does not move the board again. A card taller than the room above the keyboard still keeps the line you are typing in in view.
+- The slide takes a fifth of a second, and is instant if your phone is set to reduce motion. Nothing saved changes; this is only where the board sits on the screen.
+
+## A new item no longer gets stuck floating on the phone (2026-10-23)
+
+- On an iPhone, resting a finger on the item you were typing could lift it, and the phone then kept the touch for its own text handling, so the item was left floating over the board and hidden from its list until the page was reloaded. Holding the text you are typing in now only moves the cursor or selects, as the phone normally does.
+- If a lift, card move or resize ever loses its finger again, it ends by itself at the next touch, or when you switch to another app or tab, and the item stays where it was. Nothing was ever deleted: the item was only hidden while it floated.
+
+## On a phone, tapping into a wide card zooms in until the text is easy to read (2026-10-23)
+
+- When you tap into a note, checklist or container on a phone, the board now zooms in until its text shows at least 16px on the screen. Before, a wide card was squeezed to fit the screen and its text came out tiny.
+- A card that is wider than the screen at that zoom starts at the left edge and runs past the right edge; the line you are typing in is kept in view, sideways too.
+- If you were already zoomed in further than that, the zoom stays as you had it. A narrow card still fills the screen's width as before.
+- At the bigger A+ text steps the text is already large, so less zoom is needed. Nothing saved changes; this is only how the board is zoomed on the screen.
+
+## Checklist moves up, in the bottom pill and in the phone menu (2026-11-13)
+
+- In the pill by the zoom control, the Checklist button now sits right after Timer: Search, Timer, Checklist, Calendar, Journal, Habits. Pressing Tab walks the buttons in that same order.
+- On a phone, the Checklist tile in the ⋯ panel now sits right after the Timer tile too. The grid still has no gaps: the tile count is the same, so every row fills as before.
+
+- The crew coordinator now puts merged changes live itself once all tests pass, without waiting for "publish" (owner request). Risky changes still need the owner's yes before they are merged.
+
+## A list pulled out of a list keeps its width (2026-10-23)
+
+- Drag one or more checklist items out onto empty board space and the new list is now as wide as the list they came from. Before, it always started at the standard width, even when the list had been made wider.
+- Only the width is copied. The new list's height fits its items, however tall the old list was.
+- A list that sits inside a container has no width of its own, so a list pulled out of one still starts at the standard width. A list made at the end of a container takes the container's width, as before.
+
+## A ticked parent ticks again when its blank sub-item goes (2026-11-10)
+- If you add a new blank sub-item under a ticked item, the item unticks (as before). Now, when you remove that blank sub-item (Backspace on it, the trash can, or Delete on selected items), the item ticks again, as long as every sub-item left under it is ticked. It carries on upwards if the item above it is then complete too.
+- An item left with no sub-items keeps its tick as it was.
+- One Ctrl+Z puts back the blank sub-item and the unticked item together.
+- Cut (Ctrl+X) and removing highlighted words work as before and do not re-tick.
+- Nothing about saved boards changed; no new data is stored.
+
+## Split side-panel store actions out of boards.ts (2026-11-23)
+
+- Behind the scenes: moved the Journal, Habits, and Main checklist side-panel store actions out of `src/store/actions/boards.ts` into their own focused files (`journal.ts`, `habits.ts`, and `checklistPanel.ts`), leaving `boards.ts` focused on board creation, navigation, deletion, and version restore.
+- Nothing changes in how the app works, saves, syncs, or handles undo.
+
+## Tidy-up in the Calendar panel code (2026-11-23)
+- Split the large Calendar side panel file into focused files under `src/components/calendar/` (week list, month grid, event card, event form, repeat picker, move prompt, and confirmation dialog), keeping `CalendarPanel.tsx` as the single entry point.
+- Unified the three mutually exclusive calendar overlay states (event card, add/edit form, and drag-move prompt) into one overlay state so only one can be open at a time.
+- Removed duplicated date, time, all-day, and repeat input markup between the quick-add and full event form, and extracted pure draft validation (`validateDraft`) into `src/model/calendar.ts` with unit tests.
+- Nothing changes in how the Calendar panel looks, saves, or behaves.
+
+## Tidy-up in the Calendar store code (2026-11-23)
+- Split the large Calendar store file (`src/store/calendar.ts`) into four focused modules: `src/calendar/api.ts` (Google Calendar REST client and shared `paginateEvents` helper), `src/calendar/source.ts` (Google and local demo token source), `src/calendar/vizFetch.ts` (Visualizer past-events fetcher), and `src/store/calendar.ts` (store state and actions, re-exporting public symbols so existing callers stay unchanged).
+- Replaced four copy-pasted Calendar API pagination loops with one shared `paginateEvents` helper, covered by new unit tests in `src/calendar/api.test.ts`.
+- Simplified the store's internals by collapsing three session resets into `resetSession()`, unifying undo and redo execution into `runHistoryEntry()`, wrapping in-flight tracking in `trackFlight()`, reusing `validateDraft` from `src/model/calendar.ts`, and splitting `save()` into `saveSingle()` and `saveSeries()`.
+- Nothing changes in how Calendar sync, search, repeats, undo/redo, demo mode, or the Visualizer behave.
+
+## Unified per-board undo histories and commits (2026-11-23)
+
+- Kept every board’s undo history — including the currently open board — in a single map in `src/store/core.ts`, removing the duplicate history-swapping logic on board switches and remote replacements.
+- Collapsed the three separate board commit paths (`commit`, `commitTo`, `commitOn`) into one `commitBoard` path and the two undo paths (`stepOpen`, `undoOn`) into one `undoOn` path, keeping the app state shape, undo/redo behavior, locked-board announcements, and saved boards unchanged.
+- Stopped no-op commits on non-open boards from notifying store subscribers when nothing changed.
+
+## Central Escape and overlay dismissal stack (2026-11-23)
+- Behind the scenes: replaced the scattered Escape listeners across panels, dialogs, popovers, and calendar overlays with one small central LIFO stack (`src/components/escapeLayer.ts`) backed by a single capture `keydown` listener on `window`, plus a shared `useOutsidePointerDown` helper.
+- Removed the CSS-class sniffing helpers (`closedOne`, `escapeIsFree`, `escapeIsForPanel`, `escapeIsForChecklist`), `TimePicker`'s global `closeTimeList`, and the no-deps `useEffect` listener churn in `EventCard`, `EventForm`, and `MoveAsk`.
+- Nothing changes in how Escape or outside clicks behave across the app.
+
+## Behind the scenes: split sharing storage and comments out of sharing.ts (2026-11-23)
+
+- Moved the device-storage helpers for shared boards (`shareStorage.ts`) and card comment / unread tracking (`shareComments.ts`) out of `src/store/sharing.ts` into their own focused files with dedicated unit tests, bringing `sharing.ts` down from 999 lines to ~860 lines.
+- Replaced the four separate upload-status flags (`uploading`, `again`, `failed`, `deleting`) on each share with one typed `UploadState` state machine, preserving in-flight upload tracking if deleting a share fails.
+- Nothing changes in how shared boards, comments, permissions, or saved boards work.
+
+## Clean up keyboard shortcuts and undo routing (2026-11-23)
+
+- Merged the duplicated checklist keyboard shortcut code for board checklists and the Checklist panel into one shared helper, keeping all existing keyboard behavior unchanged.
+- Extracted the undo and redo router (`Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`) into a clear helper covering the open board, Checklist, Completed, Journal, Habits, and Google Calendar panels.
+- Added unit tests covering every undo routing branch and shared checklist shortcut path.
+
+## Stylesheet split into focused files (2026-11-23)
+
+- Behind the scenes: split the single 4,275-line stylesheet (`src/styles.css`) into 16 smaller feature-scoped CSS files under `src/styles/` (`tokens.css`, `base.css`, `toolbar.css`, `canvas.css`, `cards.css`, `checklists.css`, `overlays.css`, `panels.css`, `menus.css`, `comments.css`, `journal.css`, `habits.css`, `calendar.css`, `motion.css`, `phone.css`, and `visualizer.css`), imported in the exact same order.
+- Updated the stylesheet and theme unit tests to read the imported files and verify that every partial in `src/styles/` is included.
+- Nothing changes in how the app looks or behaves.
+
+## Behind the scenes: untangle board sync watch flow (2026-11-24)
+
+- Split the long `remote.watch` callback in `src/store/sync.ts` into four focused handlers (`handleDeletingMarker`, `reconcileHeld`, `handleFirstLoad`, and `handleRemoteUpdate`) and replaced the overlapping `ready`, `held`, `stopped`, and `failed` flags with one typed `SyncPhase` state machine.
+- Replaced the `JSON.stringify` comparison when reclaiming a board from a deleted share with `deepEqual`, so matching boards saved with keys in a different order are left untouched.
+- Extracted the shared `isGestureBusy(store)` helper (`src/store/gestureBusy.ts`) used by both `sync.ts` and `sharing.ts`.
+- Nothing changes in how boards sync, save, or handle offline edits and account deletion.
+
+## Time estimates on notes and checklist items (2026-11-11)
+
+- A note or any checklist item can now carry a time estimate, from 1 minute to a day. It shows as a small gray pill such as "30m" or "1h 30m": at the right end of an item's row, or in a note's header.
+- A note with no estimate shows a faint clock in its header when the pointer is over it. An item has no clock yet (any place for it covered the end of the item's text); an item gets an estimate from the Claude connector for now, and the owner is asked where its clock should go. Click a pill (or a note's clock) for quick choices (15m, 30m, 45m, 1h, 2h), a Minutes box, and Clear. Escape or a click elsewhere closes it without a change. Ctrl+Z undoes it like any other change.
+- Ticking an item now quietly saves the day it was ticked; unticking removes it. Nothing shows this in the app yet: it is there for later features (a weekly review). Items ticked before today have no day.
+- The Claude connector (version 1.7.0) can add items and notes with an estimate, change or clear an item's estimate, and shows estimates and ticked days when it reads a board.
+- **Behind the scenes:** boards are now saved as version 6. Boards saved before open unchanged and are written as version 6 on their next save. A copy of the app from before this change (an old tab or another device that hasn't reloaded) refuses them and asks for a reload instead of saving over them. The Claude connector needs its newest `busyants.mcpb` (version 1.7.0, built with `npm run mcp:pack`) to change your boards again; until then it says "Safe to edit: no" and changes nothing.
+
+## Leaving a shared board sends one leave (2026-11-11)
+
+- Leaving a board someone shared with you, or opening a link to a shared board that can't be used, now tells the server only once. Before, a second leave could go out, and leaving could wrongly say "no longer shared with you".
+- An out-of-date list of your shared boards no longer brings back a board you just left.
+- If leaving doesn't work ("That didn't work"), the board always stays open, as before.
+- If you were taken off a board while leaving it and then open its new link, the reopened board no longer closes by itself when the old leave answers. (The old leave can still take you off it on the server, as before.)
+
+## Sign out asks first (2026-11-12)
+
+- Choosing Sign out on a board (the button at the top right, the Sign out row in the ⋯ menu in narrower windows, and the Sign out row in the phone's ⋯ panel) now opens a small question: "Sign out? Your boards stay saved online. You can sign in again any time." You only sign out if you choose Sign out there.
+- Unless the note by the zoom control says Saved (still saving, offline, or saving failed), the question warns that your latest changes may not be saved online yet, instead of the reassurance.
+- Cancel, Escape, or a click beside the question keep you signed in, with the cursor back on the button you used. Board shortcuts do nothing while it is open.
+- The Sign out on the "This Google account can't open a board" screen and the "couldn't be loaded" screen still signs out at once: there is no board there to lose.
+- Nothing about how boards are saved or how signing out works changes.
+
+## Sign-out and Delete account leave less behind (2026-11-15)
+
+- Signing out, or another person signing in, now empties the Brain dump box and closes its dialog, so what one person typed is never shown to the next.
+- The categories Sort with AI saved on this device now go on sign-out and when another person signs in (the same person signing back in after a reload keeps them), and Delete account removes them too (only that account's own). Nothing else is removed: the AI model, limit and count, the other device settings and other people's data stay.
+- Boards are not touched.
+
+## Journal size box: follow-ups (2026-10-31)
+
+- In the size list, words made Small before now show 14 pressed. Words made Large before show 21, which isn't in the list, so nothing is pressed; − and + still step from 21 (to 20 or 24).
+- Version history no longer makes an extra copy right after an update when the boards are the same and only the saved format's version number changed.
+- **Behind the scenes:** the check that keeps changes held back while an account is being deleted elsewhere now reads the saved boards instead of matching their text, so a future change to how they are written can't quietly break it. A dark-mode color is now defined once.
+
+## Left-drag moves the board; middle or both buttons select (2026-10-23)
+- Dragging empty board with the left button now moves the board, with the closed glove from the first move. Dragging a card, container, item or handle still moves or resizes it, and clicking empty board still clears the selection.
+- To draw a selection box, hold the middle mouse button, or the left and right buttons together (either one first), and move. It works anywhere on the board, over cards, containers, links and pictures too, and never opens a link or a menu. Holding Ctrl or Shift with it keeps what is already selected and adds to it.
+- Holding Ctrl or Shift while left-dragging empty board still draws a selection box that adds to the selection, as before.
+- The cursor is the normal arrow, and the closed glove only while the board is being moved with the left button.
+- On a phone nothing changes: a swipe moves the board, and a finger that rests and then moves draws a box.
+- The Keyboard shortcuts list describes the new buttons.
+- Nothing about saved boards changed.
+
+## Backspace never deletes a card after its text box vanishes (2026-11-09)
+
+- When the text box you are typing in disappears because of something else (for example a change from another device), the next Backspace or Delete no longer deletes the card that was selected. It lets the card go instead, and an arrow key doesn't move it either. Other keys, such as Ctrl+C and Ctrl+D, work as usual.
+- Clicking a card, or leaving a text box with Escape, and then pressing Delete still deletes it as before.
+
+## One tap rule on phones, and a pinch is never a tap (2026-11-03)
+
+- Fixed: on a phone, a two-finger pinch that started on a checklist tick box (while typing in the same list) could tick the box when the fingers lifted. A second finger now cancels the tap.
+- A tap on a tick box now uses the same limits as every other tap: lifted within 0.45 seconds and within 5 pixels of where the finger came down (it was 0.5 seconds and 10 pixels). A very wobbly tap that used to tick may now need a second try.
+- The tap rule is now written in the spec (Phone layout).
+
+## A size box for checklists, notes and titles (2026-11-19)
+
+- The small format bar (it shows when you highlight text in a checklist item, a note, a card title or a container title) now has the Journal's size box in place of Small / Normal / Large: a number in px with − and + beside it. − and + step through 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, and fade at the ends. Clicking the number opens the list of sizes.
+- It works on the board and in the Checklist panel. The size still covers the whole item or box.
+- With several items of different sizes selected, the box is empty and − / + move each one from its own size.
+- Ctrl+Shift+. and Ctrl+Shift+, now step one size of the same list each press.
+- Items, notes and titles made Small or Large before look exactly as they did; the box shows them as 12 and 18 (13 and 20 on a title), and − / + step from there.
+- Copying items into the Journal and back keeps the size in px.
+- **Behind the scenes:** a size other than the usual one is saved as its number. Boards saved before are unchanged. An older copy of the app (an old tab or a device that hasn't reloaded) shows a numbered size as the usual size and would save it that way, so reload every device once this is live.
+
+## Text up to 400%, bigger tick boxes (2026-10-23)
+
+- A+ now goes on to 300%, 350% and 400% after 250%. A− brings them back down; a size you saved before still loads.
+- Checklist tick boxes are bigger: 20px at Normal (they were 16px), still growing with A− / A+ (80px at 400%), with the tick mark and the press area around them, and still centered on the item's first line. The phone keeps its 16px box.
+- Everything else on a card keeps growing with the step. Two things stop where a 200px card runs out of room: a card's collapse and trash buttons stay at their 250% size (80px), and the hover buttons on a checklist item (trash, grip, move arrows) stay at their 190% size, so the big tick box never lands on them.
+- At 300% and up a narrow card has almost no room left for item text beside the tick box: widen the card. Cards are not widened by themselves.
+
+## A small animation when you tick an item (2026-11-13)
+- Ticking a checklist item yourself (its box, a tap, or Ctrl+Enter) now plays a short animation: the box presses in and settles back while its tick grows in, and the strike-through and fade ease in. It takes about 200ms and nothing moves.
+- It plays only for the item you ticked. Unticking, undo and redo, loading, changes from another device, Clean up, and a parent ticked because its sub-items were do not play it.
+- It plays even if your device asks for reduced motion, as you asked.
+- Nothing about saved boards changed.
+
+## Ticked items stay in place (2026-10-23)
+
+- Ticking a checklist item no longer moves it into a Completed section at the bottom of the list. It stays exactly where it was, struck through and faded. Unticking puts it back to normal in the same place. This is the same for sub-items.
+- A small "Clean up" button now sits in the list's title row, left of the collapse arrow and the trash can. It shows only while something in the list is ticked. It sends that list's ticked items to the Completed panel, under today's date, as before. Arrange > Clean up and the phone's ⋯ > Clean up work as before too.
+- "Uncheck all" is gone.
+- Ctrl+Shift+Backspace now deletes every ticked item on the board, sub-items included, after asking first.
+- The arrow keys, Ctrl+Shift+Up/Down, Ctrl+Enter, Delete joining, Ctrl+A, search, item drag, pouring one list into another, Markdown import, and the Claude connector's read_board all work with ticked items in place.
+- Boards already saved open the same as before. Their ticked items now show in their place instead of at the bottom, and nothing in the saved data is reordered or changed.
+
+## Checklist tick boxes sit a little lower (2026-11-10)
+- A checklist item's tick box now sits a touch lower beside its text: 7.5% of the line below the middle of the first line (1.5px at Normal, 3px at 200%), up from 5% (1px at Normal). It is the middle option of the three you previewed.
+- Only the box moved. The text, the fold arrow and the item buttons stay where they were, and so do the box's size and its gap from the text.
+- Nothing about saved boards changed.
+
+## Ticking an item no longer moves the cursor (2026-11-09)
+
+- Pressing Ctrl+Enter (⌘+Enter) in a checklist item, or the phone's Tick button, ticks the item and leaves the cursor in it. It no longer jumps down to the next open item (or up to the one above). Pressing it again unticks the item; a Delete right after removes just that item. On a phone the keyboard and the button row stay up, as before.
+- Clicking or tapping a tick box already left the cursor alone, and unticking is unchanged.
+- The shortcuts list now says "the cursor stays in it".
+
+## Delete in a ticked checklist item removes the item, not the card (2026-10-29)
+
+- Pressing Delete with the cursor in a ticked (struck-through) item now removes that item and everything nested under it, just like its trash can. Ctrl+Z brings it back. The cursor moves to the item above (or the one below).
+- Clicking an item's tick box and then pressing Delete or Backspace used to delete the whole card, because the tick box (not the text) had the keyboard. Now it removes just that item.
+- Backspace in a ticked item still edits its text. With some letters selected, Delete deletes just those letters. Holding Delete down removes only one item.
+- Open items keep their Delete and Backspace behavior. Several selected items work as before.
+- On a phone or tablet, tapping a tick box while typing in the same list leaves the cursor where it was, so the on-screen keyboard stays up. A tick box clicked with a mouse shows no focus ring.
+
+## Journal days show the fold arrow (2026-11-10)
+- Today's page in the Journal now has the small fold arrow before its date, pointing down when the note is open and turned when it is folded, so it is clear that a click folds it.
+- The earlier days in the timeline show the same arrow before their day number. It turns the same way (and not at all with reduced motion).
+- Nothing else changes: today still opens unfolded each time the panel opens, and folds are still not remembered.
+
+## An item's trash can keeps the cursor in the list (2026-10-29)
+
+- Pressing a checklist item's trash can (by clicking it, or with Enter from the keyboard) used to leave the cursor nowhere, so the next Delete deleted the whole card. Now the cursor moves to the item above (or the one below), just like Delete in a ticked item.
+- Deleting a list's only item leaves one blank item with the cursor in it, so Delete never reaches the card.
+- With items selected in several lists, the trash can removes them all as before, and the cursor goes to its own list.
+- The same fix for Delete or Backspace with several items selected (by Shift+click or dragging): the cursor goes to the item above, so pressing Delete again no longer deletes the card.
+- Holding Enter on a trash can removes just one item; the held key doesn't then add blank items to the item above.
+- While you type in an item (in the same list or another one), pressing the trash can of a different item leaves your cursor where you were typing.
+- Holding Delete or Backspace with several items selected removes them once; it no longer eats letters from the item above.
+
+## Undo while typing never leaves Backspace free to delete the card (2026-11-09)
+
+- Pressing Ctrl+Z or Ctrl+Y while typing in a checklist item, when the undo took that item away (for example a new item you had just added), used to drop the cursor onto the page. The next Backspace then deleted the whole checklist card. Now the cursor goes to the nearest item still shown in the same list: the one above, else the one below.
+- If the undo moves the item (up or down its list, or to another list), the cursor follows it, at the same place in its text.
+- If the undo collapses the list (or its container), so no item is shown, every selected block is let go, and Backspace or Delete deletes nothing.
+- The phone's item bar Undo works the same way, and no longer puts the cursor into an item hidden in a collapsed card (where the keyboard closed).
+- Clicking the toolbar's Undo or Redo (or the Undo message's Undo, or tapping Undo or Redo in the phone's top bar) while typing in a checklist item, a note or a title now keeps the cursor there, so the same rules apply. Before, the keyboard moved to the button with the card still selected, so the next Backspace deleted the card.
+- Highlighted words in the item stay highlighted after an undo that doesn't change that item. When the undo or redo changes the item's text, the cursor goes to the end of it (as it did before this change; a redo of typing put it in the middle).
+
+## A browser test no longer fails near midnight (2026-10-31)
+
+- The Version history test that restores the Journal's writing failed when it ran in the last 11 minutes before midnight: it skips the clock ahead 11 minutes, which landed on the next day, whose journal note is empty. Its clock now starts at a fixed midday. Only the test changed; the app is unchanged.
+
+## Visualizer: a much brighter beam from space, and a light pillar (2026-11-12)
+
+- Each finished item now arrives as a bright shaft of light shooting down from beyond the top of the screen onto its cell: a white-hot core inside a wide, glowing halo in the category's color. It lands with a flash and rings, then fades.
+- A tall pillar of light runs from the top of the screen down through the middle, with a glow around it. It is always faintly there and swells brighter each time a comet arrives in the middle.
+- The comet into the middle is brighter too, with a longer trail of glowing dots, and the middle flares harder when it lands.
+- With reduced motion there are still no beams, comets or pulses: the cells just fade lit, and the pillar is a still, faint picture.
+
+## Visualizer: light warps into the middle, and categories (2026-11-12)
+
+- Each finished item now arrives as light falling into the middle: a thin beam drops onto its cell with a small ring, the cell lights, then a comet curves from the cell into the core, which flares. The cell stays faintly lit. With reduced motion you only see the cell fade lit.
+- The ring's wedges are now categories (Errands & shopping, Work, Calls & messages, Home & chores, Health & fitness, Money & admin, Learning, Social & family, Other) and the cells are the lists the items came from. A small "By category / By board" switch under the range switch changes it back to boards; it opens on By category and remembers your choice on this device.
+- A built-in word rule picks the category from the item's words first, then the list's title.
+- The "Just finished" rows now also show the category.
+
+## Sort with AI runs by itself (2026-11-13)
+
+- **The Visualizer sorts with AI on its own** when you have an Anthropic key saved: open it on By category and the finished items that have no AI category yet are sorted straight away, the same way as pressing Sort with AI.
+- A new **Sort automatically** box next to the button turns this off. It is on by default and remembered on this device. With it off, nothing is sent until you press the button, as before.
+- It sorts at most once each time you open the Visualizer for each range, so a failure is shown and not retried by itself. The button stays for the rest past 200 and for another try.
+- The hint, AI settings and the Privacy policy now say that the Visualizer can send item texts by itself.
+- An item Claude could not sort is remembered on this device, so it is not sent (and paid for) again.
+- **Sub-items are sorted with their parent in mind.** A finished sub-item now goes to Claude with the text of the item it sits under (for example "Beat the boss" under "Elden Ring"), so the sub-items of one topic land in one category. A parent like "Today" is skipped, and items that are only a time word are never sent. The hint, AI settings and the Privacy policy say so.
+- **Never paid for twice.** If this device can't save the sorted labels (storage blocked or full), Sort automatically sends nothing and says "Can't save sorted labels on this device, so Sort automatically is paused." Pressing Sort with AI still works, and any sort stops at the first batch it can't save. Once 2,000 labels are kept, Sort automatically pauses instead of dropping older ones (which would then be sent again).
+- Switching to By board while a sort runs, and back, no longer sends that batch again. Unticking Sort automatically stops a sort it started, like Cancel.
+- The Play Store data-safety notes now say the Visualizer can send item texts by itself, with a sub-item's parent text.
+- Sort with AI now leaves room for your boards: the labels and the boards share the space this browser gives the app, so a sort never writes labels that would eat into it. If they would, nothing is written and it says "Not saved: the sorted labels would use the space this device keeps for your boards."
+- Only a label that could not be saved pauses Sort automatically. Another kind of problem (the monthly AI-use count failing to save, say) shows its own message, as before.
+
+## Visualizer: Sort with AI (2026-11-13)
+
+- With your own Anthropic key saved, the Visualizer's By category view has a **Sort with AI** button. Nothing is sent until you press it.
+- A line under it says exactly what goes: only the text of the finished items on the disc. No board names, list names, notes or ids.
+- While it works you see "Sorting… X of N" and a Cancel button. Problems show the same plain messages as Test key (spend limit, too many requests, time-out and the rest).
+- Afterwards the disc shows Claude's categories (up to 8), with the built-in categories for anything left over.
+- The labels stay on this device only, so a reload does not ask again. Forget key clears them, and with no key the built-in categories come back.
+
+## Visualizer: many arrivals at once, fountains, cards (2026-11-13)
+
+- A long list no longer plays one item at a time. Items land in waves (up to eight together, a fraction of a second apart), so several thin beams hit different cells at the same moment and then it calms down to the glowing core. A short list still plays one at a time.
+- Each landing now sends up a fountain of ten glowing sparks (fewer when many are in the air at once) in curved arcs of different heights, ending in the core, which blows out to white where they meet. At the landing spot three ripple rings open across the disc and a bright white column rises for a moment.
+- The item that just landed gets a small floating card near the core: its text, and under it "category · board". It fades in, drifts up a little and fades out; at most two show at once. Plain text only.
+- Lit cells show one small magenta dash per finished item, each at its own place, instead of filling up in bands. The disc stays sparse however many items there are.
+- The disc is a little taller (more tilt). It is still held in by the names round the rim, so it is not much bigger.
+- Smooth with many items: at most eight beams and fountains are drawn at once, and the spark count per fountain shrinks when it is busy. Reduced motion is unchanged: no beams, ripples, cards or sparks, only the dashes.
+
+## Visualizer: count past and deleted calendar events (2026-11-13)
+
+- The Visualizer now also counts the Google Calendar events on your primary calendar that have passed or were deleted in the range. Each one gets a beam, sparks and a "Just finished" row with a small calendar mark, and counts in Done today, This week, the range count and the chart.
+- Which events count: your own events and the invites you accepted (all-day included); passed ones that have already ended, and deleted ones only if they were deleted after they started. Declined and no-reply invites are skipped, and each time a repeating event happened counts once.
+- By board, the events have their own "Calendar" group. By category, they fall into the built-in word categories by their title.
+- Nothing is saved. Events are never part of your boards, undo, version history, exports or sync, and their titles are never sent to Anthropic.
+- It never opens a Google window: it uses only calendar access this browser already kept. With none, a quiet line says "Open Calendar once to include your events."; signed out, nothing about the calendar shows. If the events can't be loaded, you still see your board items and one quiet line.
+
+## Visualizer never pauses (2026-11-13)
+
+- Beams and sparks now keep flowing in all the time while the Visualizer is open: a new one launches about four times a second, so there is always something in the air and never a quiet gap, however many finished items you have (even one).
+- When the list runs out it simply goes round again, with no rest and no waiting. Calm still stops all motion.
+- Each trip looks and moves as before; only the timing between them changed.
+
+## Visualizer: a much bigger disc, names moved out (2026-11-13)
+
+- The disc is now about 90% of the window's width on a computer (it was about 65%), and it sits low on the stage. On a phone it fills most of the width too (about two thirds, up from under half).
+- The category names no longer stand beside the disc, holding it back. They stand above its back and below its front, in the empty space round its shoulders, outside the dashed ring, each with its dot. They still follow their wedges as the disc turns.
+- Names never overlap each other or the disc and always stay fully on the screen. A name is shown in full unless it is wider than the whole screen.
+- On a narrow phone with long names the disc is only as big as the names allow, so they stay readable.
+- A name whose wedge passes the far left or right edge of the disc fades out for a moment as it moves from the back to the front, instead of jumping.
+- The sparks after each landing now visibly flow from the category's part of the disc into the core: they run inward along that category's wedge on the disc's tilt, curving and speeding up, then lift into the core, instead of one straight jump. There are no more sparks than before.
+- The fountains now arc higher, like the reference: the sparks rise in tall, mostly upright arcs above the landing cell before curving down into the core. The top of an arc is now about 0.075 to 0.13 of the disc's width above its path (it was 0.02 to 0.08, and 0.01 to 0.03 for the first version of the flow); the reference's arcs measure about 0.07 to 0.14.
+- The beams are thicker, like the reference: a bright thin core inside a wider, brighter pink glow. The pink band is now about 0.0055 of the disc's width across at half its brightness (it was 0.0034 on a big window), the core about twice as wide as before, and the glow is brighter (0.75, was 0.5). On a phone a beam is never thinner than a few pixels.
+- The name cards now show for many more items: up to four at once (it was two), one every 0.3 seconds in a long list (it was 0.7), each living about 2 seconds (it was 2.6). They stand in four places round the core (upper left and right, lower left and right), inside the ring the rim names stay outside of, so a card never covers another card, the core or a name. A new card takes the place of the oldest, which also removes the brief overlap of a third card. In a list of 8 items or fewer every item gets a card. On a phone, where the upper places do not fit, two show (the lower pair).
+- Reduced motion and the smooth frame rate are unchanged: the names are drawn from cached text each frame, and the disc is still painted once per size.
+
+## Visualizer: filler items are not counted (2026-11-14)
+
+- Items that mean nothing on their own are no longer counted in the Visualizer: "meow", "nowww", "test", "asdf", "lol", "ok", "stuff", "untitled", a single letter, or text with no letters at all ("1", "!!!", a check mark). Time words such as "today" and "now" were already skipped; stretched spellings ("todayyy") and short forms ("tmrw", "2day", "rn") are skipped too.
+- Real short tasks still count: "gym", "eat", "run", "tax", "vet". Only the whole text is checked, so "Test the smoke alarm" counts.
+- As before, a skipped item's ticked sub-items still count, and Sort with AI never sends a skipped item. Other screens' counts do not change.
+- Ticked items at every level count, middle levels as well as the lowest.
+
+## Visualizer: always full motion, with a Calm button (2026-11-13)
+
+- The Visualizer now ignores the system's "reduce motion" setting and always plays the full animation, on a computer and on a phone. A new **Calm** button beside the switches turns on the quiet drawing instead; it is remembered on this device and off by default.
+- Beams drop and sparks fly about twice as slowly. Beams and sparks are 1.5 times thicker, and the fountains arc 1.5 times higher (never off the top of the canvas).
+- The core glow is toned down so a crowd of arrivals never blows out to white, and it now gives a quick soft pulse each time a beam lands. Calm has no pulse.
+- Many more beams come in together (waves of about a third of the list, up to 16 at once, 60 milliseconds apart).
+- Name cards are 1.4 times bigger and the names round the rim 1.3 times bigger.
+- On a phone the ring takes about 70% of the screen, the switches are slim rows and the counts sit in one row. The × stays in reach.
+- The rest of the app still follows the system's reduce-motion setting.
+- The ripples round each landing spot open 1.5 times wider with slightly thicker lines, and the sparks glow about 1.4 times brighter.
+- The incoming beams are about 1.4 times brighter (the pillar is unchanged).
+- The name cards glow brighter: a soft green glow round a brighter border, and slightly brighter text.
+
+## Visualizer: the names round the ring read in full (2026-11-12)
+
+- The group names round the Visualizer's ring now show in full whenever they fit. The ring is a little smaller so the longest name fits beside it, and the names stand outside the dashed ring with the left and right ones aligned away from the edge, so none is clipped.
+- When space is tight (a phone), a name is cut from the end but always keeps at least its first word. A name is never empty or just "…".
+
+## Visualizer: a new look and motion (2026-11-12)
+
+- The Visualizer is now a dark violet disc seen at a steep tilt, on a near-black purple background: thin track rings, radial divisions, a dim cell grid, a dashed outer ring and a dark hub in the middle that names the group that landed last. The group names run evenly round the rim in small capitals.
+- Each finished item now arrives as a thin angled beam of light from above the screen. It lands with a bright dot and a small ring on its cell, which lights up as a short magenta arc.
+- Then a burst of five small glowing particles with short tails fans out from that cell and arcs into the core. The first one is green-tinted, the rest white and pink.
+- The core is a big soft white-to-magenta glow that stays bright between arrivals, with a thin bright pillar of light running from the top of the screen through it to the middle of the disc.
+- Your own categories, boards and counts are unchanged. With reduced motion there are still no beams, particles or pulses; the lit cells, pillar and core are a still picture. Nothing is saved or changed on your boards.
+
+## Visualizer and calendar fixes (2026-11-15)
+
+- Calm mode in the Visualizer now draws its picture once and stops, instead of redrawing the whole screen about 60 times a second. It draws again only if the window changes size.
+- A calendar event marked "tentative" no longer counts as done in the Visualizer. Only confirmed events do.
+- If a calendar is so full that the Visualizer cannot read all of it, it now keeps the newest events and leaves out the oldest, instead of the other way round.
+- After signing out and signing in again in the same tab, the Visualizer no longer opens by itself.
+
+## Visualizer: slower trips, more at once (2026-11-13)
+
+- Each beam and its sparks now take about 4 seconds instead of 2.7, so the motion is calmer.
+- A new one still launches all the time, now about five times a second, so about 20 are in the air together instead of 10. It stays one continuous stream.
+- Every fountain keeps its ten sparks. Calm still stops all motion.
+
+## Calmer Visualizer name cards (2026-11-13)
+
+- The name cards that pop up when a spark lands are subtler: a little smaller (about 1.15 times the first size instead of 1.4), with a softer green glow, a lighter fill and border, and lighter text.
+- They now ease in instead of popping.
+- Speed, beams, sparks, ripples, the core, the rim names and Calm are unchanged. Your boards are not touched.
+
+## Visualizer: bigger shooting-star sparks (2026-11-13)
+
+- The five sparks that fly from a landed cell into the core are now clearly bigger: each has a bright white-hot head in a soft glow, and a long tapering tail that follows its curved path.
+- The faster a spark goes, the longer its tail, so the burst reads like a small cluster of shooting stars rising to the core. The first spark is still tinted green.
+- The sparks start a little more staggered, so the cluster fans out slightly. Timing of the beam, ring, flare and the rest of the trip is unchanged, and so is the reduced-motion version.
+
+## Visualizer: sub-items get their own beams (2026-11-13)
+
+- A finished item that had completed sub-items no longer shows as one beam for the parent. Each completed sub-item (nested ones too) is now its own item: its own beam and sparks, its own place in the feed and name cards, and the Visualizer's numbers count it. The parent is not counted there. An item with no completed sub-items works as before. Other screens' counts are unchanged.
+- A sub-item takes the category of the item it sat under when that is descriptive (for example "Clean the garage" puts all its sub-items in Home & chores, even over a Sort with AI label). A parent like "Today" or "Now" gives nothing, so each sub-item goes by its own words, then the list title.
+- Items that are only a time word ("Today", "Now", "Daily", "Tonight", a weekday and so on) are no longer shown in the Visualizer at all. "Daily stretch" still is. Their completed sub-items still count.
+
+## Visualizer and Feedback swap places (2026-11-13)
+
+- The Visualizer now has its own button on the toolbar, right after File, where Feedback used to be. Feedback is now a row in the ⋯ More menu (still only when signed in), right below Completed.
+- On a phone it is the same swap: Feedback is the full-width row under the tiles at the top of the ⋯ sheet, and Visualizer is the row just above About BusyAnts.
+- In a narrower window, where File folds into ⋯, the two rows trade places there too.
+
+## Weekly review data, no screen yet (2026-11-11)
+- Behind the scenes only: the app can now work out a weekly review (what you ticked this week, each habit's days this week, next week's calendar by day, and how many days you wrote in the Journal). Nothing on screen changes yet; a later step adds the Week panel.
+- Habits show the days ticked this week, with no streak counter.
+- Nothing about saved boards changed; no new data is stored.
+
+## Small fixes to the Word-style checklist highlight (2026-11-02)
+
+- Typing "!" over a highlighted stretch of words now replaces it, like any other character, instead of zooming the board to fit the screen. Shift+1 still fits the board when no words are highlighted.
+- Ctrl+C and Ctrl+X on an empty highlight (nothing actually highlighted) no longer replace your earlier copy with a blank item, and change nothing.
+- While a container's "Delete …?" question is open, Tab moves between its two buttons, Escape closes it, and Tab and Ctrl+V no longer change the checklist items behind it.
+- Highlighting from the very start of the first item to the very end of the last and pressing Delete now removes the last item too, instead of leaving one blank item behind.
+
 ## The About page's demo clip and pictures show the app as it is now (2026-10-22)
 - The demo video and the board pictures on the About page were taken before the latest changes. They are recorded again from the current app: no Hand or Select tools, card titles in the button row, the new checklist rows, the folded toolbar. Same story as before: tick an item, fold a container, drag a card, type a new item. File sizes are about the same.
 - Behind the scenes: a browser test that measures the sign-in page's links on a phone now waits for the fonts to load first, so it no longer fails by one pixel now and then.

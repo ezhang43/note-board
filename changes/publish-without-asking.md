@@ -1,1 +1,0 @@
-- The crew coordinator now puts merged changes live itself once all tests pass, without waiting for "publish" (owner request). Risky changes still need the owner's yes before they are merged.

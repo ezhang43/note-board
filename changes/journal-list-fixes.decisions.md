@@ -1,1 +1,0 @@
-- 2026-11-21 Journal list markers are drawn in the note's text color (they inherit the line's color, which is --ink), never gray, for every list style and level. A highlight sits on the words, not the line, so it never colors the marker. (Worker's call, as recommended.)

@@ -1,1 +1,0 @@
-- 2026-11-21, owner request: "no need to ask me to publish going forward, can go do so without my permission". Owner picked "Publish only": the crew coordinator moves `main` up to `build/v1` once "All tests" passes there, without asking; a `high-risk` pull request still waits for the owner's yes before it is merged. CLAUDE.md rule 9 updated.
